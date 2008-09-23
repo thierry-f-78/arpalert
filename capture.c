@@ -106,6 +106,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	data_mac macs;
 	data_ip ip_32;
 	data_ip ip_33;
+	data_ip broadcast;
 	int ret;
 
 	#ifdef DEBUG
@@ -144,17 +145,24 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 
 	/* non authorized request */
 	if(config[CF_AUTHFILE].valeur.string[0]!=0){
-		if(sens_exist(ip_32, ip_33)==FALSE){
-			if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", seq, smacs, ip, iq);
-			}
-			if(config[CF_ALERT_UNAUTH_RQ].valeur.integer == TRUE){
-				ret = alerte(smacs, ip, 4);
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+		broadcast.bytes[0] = 255;
+		broadcast.bytes[1] = 255;
+		broadcast.bytes[2] = 255;
+		broadcast.bytes[3] = 255;
+		if(sens_exist(ip_32, broadcast)==FALSE){ 
+			if(sens_exist(ip_32, ip_33)==FALSE){
+				if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
+					logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", \
+					       seq, smacs, ip, iq);
 				}
-				#endif
+				if(config[CF_ALERT_UNAUTH_RQ].valeur.integer == TRUE){
+					ret = alerte(smacs, ip, 4);
+					#ifdef DEBUG
+					if(ret > 0){
+						logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+					}
+					#endif
+				}
 			}
 		}
 	}
