@@ -1,3 +1,7 @@
+0.4.2: add specific request detection
+
+0.4.1: Bug patch
+
 0.4.0: More configuration option added
        Many bugs patched
        Security fail patched

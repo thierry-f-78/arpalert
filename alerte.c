@@ -40,7 +40,9 @@ void addpid(int pid){
 	num_pids++;
 
 	/* reallocation de la memoire */
-	test = (c_pid *)realloc(pids, num_pids * sizeof(c_pid));
+	if(num_pids!=0){
+		test = (c_pid *)realloc(pids, num_pids * sizeof(c_pid));
+	}
 	if(test == NULL){
 		logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct", __FILE__, __LINE__);
 		free(pids);
@@ -80,7 +82,8 @@ void delpid(int pid){
 	if(num_pids>0){
 		test = (c_pid *)realloc(pids, num_pids * sizeof(c_pid));
 		if(test == NULL){
-			logmsg(LOG_ERR, "[%s %i] Can't reallocate memory [%i] for c_pid struct", __FILE__, __LINE__, num_pids * sizeof(c_pid));
+			logmsg(LOG_ERR, "[%s %i] Can't reallocate memory [%i] for c_pid struct",
+				__FILE__, __LINE__, num_pids * sizeof(c_pid));
 			free(pids);
 			exit(1);
 		}
@@ -88,11 +91,12 @@ void delpid(int pid){
 	}
 }
 
-void alerte_kill_pid(void){
+void alerte_kill_pid(int signal){
 	int ret;
-	int i;
+	/*int i;*/
 	int status;
 
+	/*
 	i=0;
 	while(i < num_pids){
 		#ifdef DEBUG
@@ -105,6 +109,12 @@ void alerte_kill_pid(void){
 		logmsg(LOG_DEBUG, "[%s %i] Stop waitpid", __FILE__, __LINE__);
 		#endif
 	}
+	*/
+	ret = waitpid(0, &status, WNOHANG);
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %i] pid [%i] ended", __FILE__, __LINE__, ret); 
+	#endif
+	if(ret > 0)delpid(ret);
 }
 
 /* verification des pids */
@@ -125,8 +135,8 @@ void alerte_check(void){
 		/* va voir si le processus fonctionne */
 		ret = waitpid(pids[i].pid, &status, WNOHANG);
 		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] analyse de pid[%i]: %i, temps: %i, code retour = %i", __FILE__, __LINE__,
-			i, pids[i].pid, (unsigned int)pids[i].time, ret);
+		logmsg(LOG_DEBUG, "[%s %i] analyse de pid[%i]: %i, temps: %i, code retour = %i",
+			__FILE__, __LINE__, i, pids[i].pid, (unsigned int)pids[i].time, ret);
 		#endif
 
 		/* si il fonctionne mais que son temps est depasse */
@@ -135,22 +145,22 @@ void alerte_check(void){
 			
 			/* on le tue */
 			if(kill(pids[i].pid, 9) < 0){
-				logmsg(LOG_ERR, "[%s %i] I can't kill pid [%i]: %i", __FILE__, __LINE__, i, pids[i].pid);
-			} /*else {
-				waitpid(pids[i].pid, &status, 0);
-				delpid(pids[i].pid);
-			}*/
+				logmsg(LOG_ERR, "[%s %i] I can't kill pid [%i]: %i",
+					__FILE__, __LINE__, i, pids[i].pid);
+			}
 		} 
 		#ifdef DEBUG
 		else {
-			logmsg(LOG_DEBUG, "[%s %i] pid[%i]: %i is not timeout", __FILE__, __LINE__, i, pids[i].pid);
+			logmsg(LOG_DEBUG, "[%s %i] pid[%i]: %i is not timeout",
+				__FILE__, __LINE__, i, pids[i].pid);
 		}
 		#endif
 
 		/* si il ne fonctionne plus */
 		if(ret==-1){
 			#ifdef DEBUG
-			logmsg(LOG_DEBUG, "[%s %i] pid[%i]: %i is ended, removing from check list", __FILE__, __LINE__, i, pids[i].pid);
+			logmsg(LOG_DEBUG, "[%s %i] pid[%i]: %i is ended, removing from check list",
+				__FILE__, __LINE__, i, pids[i].pid);
 			#endif
 
 			/* on l'efface de la liste */
@@ -183,15 +193,21 @@ int alerte(unsigned char *mac, unsigned char *ip, int alert_level){
 	}
 	if(pid>0){
 		addpid(pid);
+		/* set signal killchld */
+		/*
+		(void)setsignal(SIGCHLD, alerte_kill_pid);
+		*/
 		return(pid);
 	}
 
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Attempt to execute \"%s\"", __FILE__, __LINE__, config[CF_ACTION].valeur.string);
+	logmsg(LOG_DEBUG, "[%s %i] Attempt to execute \"%s\"", __FILE__, __LINE__,
+		config[CF_ACTION].valeur.string);
 	#endif
 	
 	snprintf(alert, 5, "%i", alert_level);
-	ret = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string, mac, ip, alert, NULL);
+	ret = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string,
+		mac, ip, alert, NULL);
 	if(ret < 0){
 		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s", __FILE__, __LINE__,
 			config[CF_ACTION].valeur.string, errno, errmsg[errno]);

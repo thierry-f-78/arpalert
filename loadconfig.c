@@ -130,6 +130,26 @@ void config_load(void){
 	strncpy(config[CF_LOGIP].attrib, "log ip change", 512);
 	config[CF_LOGIP].valeur.integer = TRUE;
 	
+	config[CF_AUTHFILE].type = 0;
+	strncpy(config[CF_AUTHFILE].attrib, "auth request file", 512);
+	config[CF_AUTHFILE].valeur.string[0] = 0;
+
+	config[CF_LOG_UNAUTH_RQ].type = 2;
+	strncpy(config[CF_LOG_UNAUTH_RQ].attrib, "log unauth request", 512);
+	config[CF_LOG_UNAUTH_RQ].valeur.integer = TRUE;
+
+	config[CF_ALERT_UNAUTH_RQ].type = 2;
+	strncpy(config[CF_ALERT_UNAUTH_RQ].attrib, "alert on unauth request", 512);
+	config[CF_ALERT_UNAUTH_RQ].valeur.integer = TRUE;
+	
+	config[CF_LOG_ABUS].type = 2;
+	strncpy(config[CF_LOG_ABUS].attrib, "log request abus", 512);
+	config[CF_LOG_ABUS].valeur.integer = TRUE;
+
+	config[CF_ALERT_ABUS].type = 2;
+	strncpy(config[CF_ALERT_ABUS].attrib, "alert on request abus", 512);
+	config[CF_ALERT_ABUS].valeur.integer = TRUE;
+	
 	/* cherche / recharge les parametres de la ligne de commande */
 	optind = 0;
 	strncpy(config_file, CONFIG_FILE, 2048);

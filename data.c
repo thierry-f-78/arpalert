@@ -78,7 +78,7 @@ void data_reset(void){
 			} else {
 				break;
 			}
-		}
+	}
 		*init_null = NULL;
 		init_null++;
 	}
@@ -135,7 +135,8 @@ void data_add(data_mac *mac, int status,  int ip){
 		*add = libre;
 		#ifdef DEBUG
 			data_tomac(*mac, buf);
-			logmsg(LOG_DEBUG, "[%s %i] Address %s add in memory at 0x%x", __FILE__, __LINE__, buf, (unsigned int)add);
+			logmsg(LOG_DEBUG, "[%s %i] Address %s add in memory at 0x%x",
+				__FILE__, __LINE__, buf, (unsigned int)add);
 		#endif
 		data_size++;
 	}
@@ -152,7 +153,8 @@ void data_dump(void){
 	if(config[CF_LEASES].valeur.string[0] != 0){
 		fp = fopen(config[CF_LEASES].valeur.string, "w");
 		if(fp == NULL){
-			logmsg(LOG_ERR, "[%s %i] Can't open file [%s]", __FILE__, __LINE__, config[CF_LEASES].valeur.string);
+			logmsg(LOG_ERR, "[%s %i] Can't open file [%s]", __FILE__, __LINE__, 
+				config[CF_LEASES].valeur.string);
 			return;
 		}
 	} else {
@@ -166,11 +168,20 @@ void data_dump(void){
 			if(del != NULL){
 				data_tomac((*del).data.mac, s_mac);
 				if(
-						(config[CF_DMPBL].valeur.integer == TRUE && del[0].data.flag == DENY)
-					||	(config[CF_DMPWL].valeur.integer == TRUE && del[0].data.flag == ALLOW)
-					||	(config[CF_DMPAPP].valeur.integer == TRUE && del[0].data.flag == APPEND)
+					(
+					 	config[CF_DMPBL].valeur.integer == TRUE 
+						&& del[0].data.flag == DENY
+					) || (
+						config[CF_DMPWL].valeur.integer == TRUE 
+						&& del[0].data.flag == ALLOW
+					) || (
+						config[CF_DMPAPP].valeur.integer == TRUE 
+						&& del[0].data.flag == APPEND
+					)
 				){
-					snprintf(msg, 128, "%s %i.%i.%i.%i\n", s_mac, del[0].data.ip.bytes[0], del[0].data.ip.bytes[1], del[0].data.ip.bytes[2], del[0].data.ip.bytes[3]);
+					snprintf(msg, 128, "%s %i.%i.%i.%i\n", s_mac, 
+						del[0].data.ip.bytes[0], del[0].data.ip.bytes[1], 
+						del[0].data.ip.bytes[2], del[0].data.ip.bytes[3]);
 					fputs(msg, fp);
 				}
 				del = (*del).next;
@@ -180,7 +191,6 @@ void data_dump(void){
 		}
 		init_null++;
 	}
-
 	fclose(fp);
 }
 

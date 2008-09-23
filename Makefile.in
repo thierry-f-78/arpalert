@@ -18,7 +18,6 @@ config_dir = @sysconfdir@/arpalert
 leases_dir = @localstatedir@/lib/arpalert
 lock_dir = @localstatedir@/run
 
-
 LIBS = @LIBS@
 OBJECT_LIST = \
 	obj/arpalert.o \
@@ -28,6 +27,7 @@ OBJECT_LIST = \
 	obj/maclist.o \
 	obj/serveur.o \
 	obj/alerte.o \
+	obj/sens.o \
 	obj/capture.o
 
 #DEFS = -DCONFIG_FILE=\"@sysconfdir@/arpalert/arpalert.conf\"
@@ -57,6 +57,9 @@ obj/serveur.o: serveur.c serveur.h config.h
 obj/capture.o: capture.c capture.h config.h
 	${CC} ${FLAGS} -c -o obj/capture.o capture.c ${DEFS}
 
+obj/sens.o: sens.c sens.h sens.h config.h
+	${CC} ${FLAGS} -c -o obj/sens.o sens.c ${DEFS}
+
 obj/alerte.o: alerte.c alerte.h config.h
 	${CC} ${FLAGS} -c -o obj/alerte.o alerte.c ${DEFS}
 
@@ -80,6 +83,7 @@ install:
 		echo "Maclist file                    = ${config_dir}/maclist.allow" >> ${config_dir}/arpalert.conf; \
 		echo "Maclist alert file              = ${config_dir}/maclist.deny" >> ${config_dir}/arpalert.conf; \
 		echo "Maclist leases file             = ${leases_dir}/arpalert.leases" >> ${config_dir}/arpalert.conf; \
+		echo "auth request file               = ${config_dir}/authrq.conf" >> ${config_dir}/arpalert.conf; \
 		echo >> ${config_dir}/arpalert.conf; \
 		echo "Lock file                       = ${lock_dir}/arpalert.lock" >> ${config_dir}/arpalert.conf; \
 		cat etc/arpalert.conf.in  >> ${config_dir}/arpalert.conf; \

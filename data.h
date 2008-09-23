@@ -3,6 +3,9 @@
 #define DENY 2
 #define APPEND 3
 
+#ifndef __DATA_H
+#define __DATA_H 1
+
 /* defini une adresse mac */
 typedef struct {
 	unsigned char octet[6];
@@ -33,3 +36,4 @@ void data_tomac(data_mac, unsigned char *);
 void data_tohex(unsigned char *, data_mac *);
 int data_toip(unsigned char *);
 
+#endif

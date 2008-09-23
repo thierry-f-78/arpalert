@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,3 +58,19 @@ void daemonize(void){
 	snprintf(str, 12, "%d\n", getpid());
 	write(fd, str, strlen(str));
 }
+
+void (*setsignal (int signal, void (*function)(int)))(int) {    
+	struct sigaction old, new;
+
+	memset(&new, 0, sizeof(struct sigaction));
+	new.sa_handler = function;
+	new.sa_flags = SA_RESTART;
+	sigemptyset(&(new.sa_mask));
+	if (sigaction(signal, &new, &old)){ 
+		logmsg(LOG_ERR, "[%s %i] Error when setting signal %i", __FILE__, __LINE__, signal);
+		exit(1);
+	}
+	return(old.sa_handler);
+}
+
+

@@ -43,6 +43,11 @@ alert on new address = TRUE		alerte sur le nouvelles adresses
 alert on ip change = TRUE		loggue sur les changement d'ip
 log ip change = TRUE			alerte sur les changement d'ip
 
+Detection de requetes interdites
+auth request file = ""			fichier contenant les requettes authorisés par adresses
+log unauth request = TRUE		logger les requetes non authorisées
+alert on unauth request = TRUE		alerte sur les requetes non authorisées
+
 arpalert passe en argument au script:
 
 script mac_address ip_adress alert_type
@@ -52,4 +57,5 @@ alert_type:
 1: adresse deja referencée
 2: adresse reference dans la liste non authorisée
 3: adresse non reference
+4: requete non authorisée
 

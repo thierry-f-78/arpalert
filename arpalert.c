@@ -12,6 +12,7 @@
 #include "capture.h"
 #include "serveur.h"
 #include "alerte.h"
+#include "sens.h"
 
 /* intervalle entre deux checkpoint 
  * le 0 desactve le dump regulier */
@@ -20,9 +21,9 @@
 void die(int);
 void loadconfig(int);
 void dumpmaclist(int);
-void killchild(int);
-/*void setsignal(int, void *);*/
-void (*setsignal (int, void (*)(int)))(int);
+/* void killchild(int); */
+/* void setsignal(int, void *); */
+/* void (*setsignal (int, void (*)(int)))(int); */
 
 int dumptime = 0;
 int nettoyage = 0;
@@ -46,12 +47,15 @@ int main(int argc, char **argv){
 	(void)setsignal(SIGABRT, die);
 	(void)setsignal(SIGHUP,  loadconfig); 
 	(void)setsignal(SIGALRM, dumpmaclist);
+	/*
 	if(config[CF_ACTION].valeur.string[0]!=0){
 		(void)setsignal(SIGCHLD, killchild);
 	}
+	*/
 
 	/* initialisation de la structure mac */
 	data_init();
+	sens_init();
 
 	/* INIT DES ALERTES */
 	if(config[CF_ACTION].valeur.string[0]!=0){
@@ -69,12 +73,6 @@ int main(int argc, char **argv){
 
 	/* boucle principale */
 	cap_snif();
-
-	/* nettoyage des zones memoires */
-	data_close();
-
-	/* valeur de retour */
-	exit(0);
 }
 
 void die(int signal){
@@ -82,12 +80,8 @@ void die(int signal){
 	logmsg(LOG_DEBUG, "[%s %i] End with signal: %i", __FILE__, __LINE__, signal);
 	#endif
 	data_close();
+	sens_free();
 	exit(0);
-}
-
-void killchild(int signal){
-	alerte_kill_pid();
-	(void)setsignal(SIGCHLD, killchild);
 }
 
 void loadconfig(int signal){
@@ -116,19 +110,5 @@ void dumpmaclist(int signal){
 	alerte_check();
 	cap_abus();
 	alarm(CHECKPOINT);
-}
-
-void (*setsignal (int signal, void (*function)(int)))(int) {	
-	struct sigaction old, new;
-
-	memset(&new, 0, sizeof(struct sigaction));
-	new.sa_handler = function;
-	new.sa_flags = SA_RESTART;
-	sigemptyset(&(new.sa_mask));
-	if (sigaction(signal, &new, &old)){
-		logmsg(LOG_ERR, "[%s %i] Error when setting signal %i", __FILE__, __LINE__, signal);
-		exit(1);
-	}
-	return(old.sa_handler);
 }
 

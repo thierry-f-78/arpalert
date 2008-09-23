@@ -8,6 +8,7 @@
 #include <time.h>
 #include <string.h>
 #include "capture.h"
+#include "sens.h"
 #include "log.h"
 #include "loadconfig.h"
 #include "data.h"
@@ -64,15 +65,15 @@ void cap_snif(void){
 	logmsg(LOG_DEBUG, "[%s %i] pcap link type:  %s", __FILE__, __LINE__, pcap_datalink_val_to_name(pcap_datalink(idcap)));
 	switch(pcap_datalink(idcap)){
 		case DLT_EN10MB:
-			base = 22;
+			base = 21;
 			break;
 
 		case DLT_LINUX_SLL:
-			base = 24;
+			base = 23;
 			break;
 
 		default:
-			base = 22;
+			base = 21;
 			break;
 	}
 	
@@ -98,38 +99,81 @@ void cap_snif(void){
 }
 
 void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
-	data_mac macs;
 	unsigned char smacs[18];
 	unsigned char ip[16];
+	unsigned char iq[16];
 	data_pack *data;
+	data_mac macs;
 	data_ip ip_32;
+	data_ip ip_33;
 	int ret;
 
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] Capture packet", __FILE__, __LINE__);
 	#endif
+	
+	if(buff[base + 0] != 1) return;
+	
+	/* mac du poseur de question */
+	macs.octet[0] = buff[base + 1];
+	macs.octet[1] = buff[base + 2];
+	macs.octet[2] = buff[base + 3];
+	macs.octet[3] = buff[base + 4];
+	macs.octet[4] = buff[base + 5];
+	macs.octet[5] = buff[base + 6];
 
-	macs.octet[0] = buff[base + 0];
-	macs.octet[1] = buff[base + 1];
-	macs.octet[2] = buff[base + 2];
-	macs.octet[3] = buff[base + 3];
-	macs.octet[4] = buff[base + 4];
-	macs.octet[5] = buff[base + 5];
-	ip_32.bytes[0] = buff[base + 6];
-	ip_32.bytes[1] = buff[base + 7];
-	ip_32.bytes[2] = buff[base + 8];
-	ip_32.bytes[3] = buff[base + 9];
+	/* ip du questionneur */
+	ip_32.bytes[0] = buff[base + 7];
+	ip_32.bytes[1] = buff[base + 8];
+	ip_32.bytes[2] = buff[base + 9];
+	ip_32.bytes[3] = buff[base + 10];
 		
+	/* ip du questionné */
+	ip_33.bytes[0] = buff[base + 17];
+	ip_33.bytes[1] = buff[base + 18];
+	ip_33.bytes[2] = buff[base + 19];
+	ip_33.bytes[3] = buff[base + 20];
+
 	data_tomac(macs, smacs);
 	snprintf((char *)ip, 16, "%u.%u.%u.%u", ip_32.bytes[0], ip_32.bytes[1], ip_32.bytes[2], ip_32.bytes[3]);
+	snprintf((char *)iq, 16, "%u.%u.%u.%u", ip_33.bytes[0], ip_33.bytes[1], ip_33.bytes[2], ip_33.bytes[3]);
 
 	data = data_exist(&macs);
 
 	seq++;
-	
+
+	/* non authorized request */
+	if(config[CF_AUTHFILE].valeur.string[0]!=0){
+		if(sens_exist(ip_32, ip_33)==FALSE){
+			if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
+				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", seq, smacs, ip, iq);
+			}
+			if(config[CF_ALERT_UNAUTH_RQ].valeur.integer == TRUE){
+				ret = alerte(smacs, ip, 4);
+				#ifdef DEBUG
+				if(ret > 0){
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+				}
+				#endif
+			}
+		}
+	}
+
+	/* excessive request */
 	abus--;
 	if(abus==0){
-		logmsg(LOG_NOTICE, "Abnormal network ARP requests");
+		if(config[CF_LOG_ABUS].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, type=rqabus", seq);
+		}
+
+		if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
+			ret = alerte(smacs, ip, 5);
+			#ifdef DEBUG
+			if(ret > 0){
+				logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+			}
+			#endif
+		}
 	}
 	
 	/* si pas d'adresse identifiée */
@@ -155,8 +199,10 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	/* test ip */
 	if(data[0].ip.ip != ip_32.ip){
 		if(config[CF_LOGIP].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s reference=%u.%u.%u.%u type=ip_change)",
-				seq, smacs, ip, ip_32.bytes[0], ip_32.bytes[1], ip_32.bytes[2], ip_32.bytes[3]);
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%u.%u.%u.%u, type=ip_change)",
+				seq, smacs, ip, 
+				data[0].ip.bytes[0], data[0].ip.bytes[1], 
+				data[0].ip.bytes[2], data[0].ip.bytes[3]);
 		}
 		
 		if(config[CF_ALRIP].valeur.integer == TRUE){

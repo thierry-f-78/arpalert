@@ -21,4 +21,10 @@ log new address			= TRUE
 alert on new address		= TRUE
 log ip change			= TRUE
 alert on ip change      	= TRUE
-
+log unauth request		= TRUE
+alert on unauth request		= TRUE
+log unauth request		= TRUE
+alert on unauth request		= TRUE
+log request abus		= TRUE
+alert on request abus		= TRUE
+				    
