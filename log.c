@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.c 508 2007-06-07 09:12:02Z thierry $
+ * $Id: log.c 531 2007-08-03 18:49:58Z thierry $
  *
  */
 
@@ -45,6 +45,10 @@ const char *mois[12] = {
 int syslog_initialized = FALSE;
 int file_initialized = FALSE;
 
+// used for compose log
+#define LOG_MAX_SIZE 512
+char log_msg[LOG_MAX_SIZE];
+
 void initlog(void){
 	#ifdef USE_SYSLOG
 	if(config[CF_USESYSLOG].valeur.integer == TRUE){
@@ -68,7 +72,6 @@ void initlog(void){
 
 void logmsg(int priority, const char *fmt, ...){
 	va_list ap;
-	char msg[4096];
 	struct tm *tm;
 
 	// check if I do log this priority
@@ -80,13 +83,13 @@ void logmsg(int priority, const char *fmt, ...){
 	tm = localtime((time_t *)(&current_t.tv_sec));
 
 	va_start(ap, fmt);
-	vsnprintf(msg, 4096, fmt, ap);
+	vsnprintf(log_msg, LOG_MAX_SIZE, fmt, ap);
 	va_end(ap);
 
 	#ifdef USE_SYSLOG
 	if(config[CF_USESYSLOG].valeur.integer == TRUE &&
 	   syslog_initialized == TRUE){
-		syslog(priority, msg); 
+		syslog(priority, log_msg); 
 	}
 	#endif
 
@@ -100,7 +103,7 @@ void logmsg(int priority, const char *fmt, ...){
 		        tm->tm_min,
 		        tm->tm_sec, 
 		        //for year: tm->tm_year+1900,
-		        msg);
+		        log_msg);
 		fflush(lf);
 	}
 
@@ -111,7 +114,7 @@ void logmsg(int priority, const char *fmt, ...){
 		        tm->tm_hour,
 		        tm->tm_min,
 		        tm->tm_sec, 
-		        msg);
+		        log_msg);
 	}
 }
 

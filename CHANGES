@@ -1,3 +1,10 @@
+2.0.7   * info<at>arpalert<dot>org
+          minor openbsd bugfix (thanks Andy)
+          very minor code optimization
+          check string representation of mac adress memory size
+          allocate static memory for many buffers
+          openbsd Makefile compatibility
+
 2.0.6   * info<at>arpalert<dot>org
           default config file syntax correction and comments
           display list of mac vendor loaded only in debug compil mode

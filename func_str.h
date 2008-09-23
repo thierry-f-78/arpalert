@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: func_str.h 508 2007-06-07 09:12:02Z  $
+ * $Id: func_str.h 531 2007-08-03 18:49:58Z  $
  *
  */
 
@@ -18,8 +18,9 @@
 
 // translate binary data mac to string data mac
 // void data_tomac(struct ether_addr, char *);
+#define MAC_SIZE 18
 #define MAC_TO_STR(a, b) \
-	sprintf((b), "%02x:%02x:%02x:%02x:%02x:%02x", \
+	snprintf((b), MAC_SIZE, "%02x:%02x:%02x:%02x:%02x:%02x", \
 	        (a).ETHER_ADDR_OCTET[0], \
 	        (a).ETHER_ADDR_OCTET[1], \
 	        (a).ETHER_ADDR_OCTET[2], \

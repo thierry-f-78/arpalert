@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadmodule.c 508 2007-06-07 09:12:02Z  $
+ * $Id: loadmodule.c 531 2007-08-03 18:49:58Z  $
  *
  */
 

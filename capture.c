@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 508 2007-06-07 09:12:02Z thierry $
+ * $Id: capture.c 531 2007-08-03 18:49:58Z thierry $
  *
  */
 
@@ -82,6 +82,9 @@ int base = 21;
 int count = 0;
 struct timeval last_count;
 
+// lib pcap error buffer
+char pcap_err[PCAP_ERRBUF_SIZE];
+
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 
 // alert bitfiels
@@ -107,8 +110,7 @@ int flag_to_no(U_INT32_T flag){
 }
 
 pcap_t *cap_init_device(struct capt *cap_id){
-	char err[PCAP_ERRBUF_SIZE];
-	char filtre[1024];
+	char *filtre;
 	struct bpf_program bp;
 	int promisc;
 	pcap_t *idcap;
@@ -126,7 +128,8 @@ pcap_t *cap_init_device(struct capt *cap_id){
 #endif
 
 #if (__NetBSD__ || __FreeBSD__ || __OpenBSD__)
-	int mib[6], len;
+	int mib[6];
+	size_t len;
 	char *buf;
 	unsigned char *ptr;
 	struct if_msghdr *ifm;
@@ -223,10 +226,10 @@ pcap_t *cap_init_device(struct capt *cap_id){
 	}
 	
 	// interface initialization 
-	idcap = pcap_open_live(cap_id->device, SNAP_LEN, promisc, 10, err);
+	idcap = pcap_open_live(cap_id->device, SNAP_LEN, promisc, 10, pcap_err);
 	if(idcap == NULL){
 		logmsg(LOG_ERR, "[%s %i] pcap_open_live error: %s",
-		       __FILE__, __LINE__, err);
+		       __FILE__, __LINE__, pcap_err);
 		exit(1);
 	}
 
@@ -240,9 +243,9 @@ pcap_t *cap_init_device(struct capt *cap_id){
 	
 	// generate filter
 	if(config[CF_ONLY_ARP].valeur.integer == TRUE){
-		sprintf(filtre, "arp or rarp");
+		filtre = "arp or rarp";
 	} else {
-		*filtre = 0;
+		filtre = "";
 	}
 
 	// filter initiliazation
@@ -272,7 +275,6 @@ void cap_init(void){
 	char *device = NULL;
 	char *base, *parse;
 	int state, gbreak;
-	char err[PCAP_ERRBUF_SIZE];
 
 	first_capt = NULL;
 	alert_bitfield = 0;
@@ -324,9 +326,9 @@ void cap_init(void){
 	// if no device specified, auto select the first
 	if(config[CF_IF].valeur.string == NULL ||
 	   config[CF_IF].valeur.string[0] == 0){
-		if((device = pcap_lookupdev(err))==NULL){
+		if((device = pcap_lookupdev(pcap_err))==NULL){
 			logmsg(LOG_ERR, "[%s %i] pcap_lookupdev: %s",
-			       __FILE__, __LINE__, err);
+			       __FILE__, __LINE__, pcap_err);
 			exit(1);
 		}
 		logmsg(LOG_NOTICE, "Auto selected device: %s", device);
@@ -463,8 +465,8 @@ void send_alert(struct ether_addr *mac_sender,
                 struct in_addr ref_ip,
                 char *interface){
 	int alert_no;
-	char str_ref[18];
-	char str_eth_mac_sender[18];
+	char str_ref[MAC_SIZE];
+	char str_eth_mac_sender[MAC_SIZE];
 	char str_arp_ip_sender[16];
 	char *vendor = NULL;
 
@@ -549,10 +551,10 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 	struct timeval sous;
 
 	// string conversions
-	char str_eth_mac_sender[18];
-	char str_eth_mac_rcpt[18];
-	char str_arp_mac_sender[18];
-	char str_arp_mac_rcpt[18];
+	char str_eth_mac_sender[MAC_SIZE];
+	char str_eth_mac_rcpt[MAC_SIZE];
+	char str_arp_mac_sender[MAC_SIZE];
+	char str_arp_mac_rcpt[MAC_SIZE];
 	char str_arp_ip_sender[16];
 	char str_arp_ip_rcpt[16];
 

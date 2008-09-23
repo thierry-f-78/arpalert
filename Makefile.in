@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile.in 508 2007-06-07 09:12:02Z thierry $
+# $Id: Makefile.in 531 2007-08-03 18:49:58Z thierry $
 # 
 
 prefix = @prefix@
@@ -46,8 +46,8 @@ OBJECT_LIST = \
 	$(src_dir)/alertes.o \
 	$(src_dir)/capture.o
 
-arpalert: $(OBJECT_LIST)
-	$(CC) $(LDFLAGS) -g -O2 -o arpalert $(OBJECT_LIST) $(LIBS)
+arpalert: $(OBJECT_LIST) build_module_example
+	$(CC) $(LDFLAGS) -o arpalert $(OBJECT_LIST) $(LIBS)
 
 loadmodule.o: loadmodule.c config.h log.h loadmodule.h loadconfig.h
 	$(CC) $(CFLAGS) -c -o loadmodule.o $(src_dir)/loadmodule.c
@@ -104,6 +104,9 @@ sens_timeouts.o: sens_timeouts.c sens_timeouts.h config.h data.h log.h \
 serveur.o: serveur.c serveur.h config.h log.h loadconfig.h
 	$(CC) $(CFLAGS) -c -o serveur.o $(src_dir)/serveur.c
 
+build_module_example:
+	-@cd module_example; make; cd ..
+
 mrproper: clean
 	-@rm -rf arpalert-sources.pdf autom4te.cache configure Makefile \
 	       scripts/start/arpalert-debian scripts/start/arpalert-fc4 \
@@ -112,7 +115,7 @@ mrproper: clean
 
 clean:
 	-@rm -f *~ *.o config.log config.status arpalert
-	-@make -C module_example clean
+	-@cd module_example; make clean; cd ..
 	
 install:
 	/bin/sh -x install.sh

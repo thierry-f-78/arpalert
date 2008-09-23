@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 508 2007-06-07 09:12:02Z thierry $
+ * $Id: data.c 531 2007-08-03 18:49:58Z thierry $
  *
  */
 
@@ -178,7 +178,7 @@ void data_update_field(struct ether_addr *mac, int status,
                     U_INT32_T field, struct capt *idcap){
 	struct data_pack *datap;
 	#ifdef DEBUG 
-	char buf[18];
+	char buf[MAC_SIZE];
 	#endif
 	
 	// check if this mac exists
@@ -322,7 +322,7 @@ struct data_pack *data_add(struct ether_addr *mac, int status,
 	struct data_pack *libre;
 	int mac_hash;
 	#ifdef DEBUG 
-	char buf[18];
+	char buf[MAC_SIZE];
 	#endif
 
 	if(data_size >= config[CF_MAXENTRY].valeur.integer){
