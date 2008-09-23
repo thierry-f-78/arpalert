@@ -6,7 +6,7 @@
 #AC_SUBST(VERSION)
 
 # Process this file with autoconf to produce a configure script.
-AC_INIT(arpalert, 1.1.2)
+AC_INIT(arpalert, 1.1.3)
 
 # Checks for programs.
 AC_PROG_CC

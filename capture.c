@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 274 2006-10-12 15:31:12Z  $
+ * $Id: capture.c 222 2006-10-05 18:00:43Z  $
  *
  */
 

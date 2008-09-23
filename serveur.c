@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.c 274 2006-10-12 15:31:12Z  $
+ * $Id: serveur.c 182 2006-10-04 16:50:52Z  $
  *
  */
 
