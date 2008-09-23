@@ -1,25 +1,11 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.h 313 2006-10-16 12:54:40Z thierry $
+ * $Id: loadconfig.h 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
 #ifndef __LOADCONFIG_H__
 #define __LOADCONFIG_H__
-
-/*
- * types:
- *  0: char
- *  1: int
- *  2: boolean
- *  3: octal
- *
- * attrib:
- *  parameter value in config file
- *
- * value:
- *  valeur du parametre de type indefini
- */
 
 #define TRUE                1
 #define FALSE               0
@@ -59,6 +45,12 @@ enum {
 	CF_UNAUTH_TO_METHOD,
 	CF_ONLY_ARP,
 	CF_DUMP_INTER,
+
+	// mac addr to vendor conversion
+	CF_MACCONV_FILE,
+	CF_LOG_VENDOR,
+	CF_ALERT_VENDOR,
+	CF_MOD_VENDOR,
 
 	// module path
 	CF_MOD_ALERT,
@@ -109,6 +101,19 @@ enum {
 int flagdump;
 
 
+/*
+ * types:
+ *  0: char
+ *  1: int
+ *  2: boolean
+ *  3: octal
+ *
+ * attrib:
+ *  parameter value in config file
+ *
+ * value:
+ *  valeur du parametre de type indefini
+ */
 typedef struct {
 	int		type;
 	char		*attrib;

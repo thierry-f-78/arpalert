@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadmodule.h 313 2006-10-16 12:54:40Z  $
+ * $Id: loadmodule.h 399 2006-10-29 08:09:10Z  $
  *
  */
 
@@ -22,5 +22,6 @@ void alerte_mod(struct ether_addr *mac_sender,
                 int type,
                 struct ether_addr *ref_mac,
                 struct in_addr ref_ip,
-                char *interface);
+                char *interface,
+                char *vendor);
 

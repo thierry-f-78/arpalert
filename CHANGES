@@ -1,3 +1,16 @@
+2.0.1   * info<at>arpalert<dot>org
+BETA      retrieve mac vendor name
+          load leases files and remember the mac already discovered
+          port on solaris8 ultrasparc IIi
+          reload "white list", "black list", "authorizations"
+                 and "oui.txt" when a sighup is received
+          generalise use of errno
+          code cleaning
+          change install system
+          generate default config
+          scheduler bug in dump leases time
+          launch a laeses file dump before quit
+
 2.0.0   * info<at>arpalert<dot>org
 BETA      permit to listen more than one interface
           port on solaris10
@@ -84,6 +97,8 @@ BETA      permit to listen more than one interface
           Add suse start script
           Add FC4 start script
           Add 2 management scripts
+
+0.4.15-1: bugfix: new mac detection error
 
 0.4.15: bugfix: probleme in function data_cmp
         rewrite many parts of code.

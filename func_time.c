@@ -1,6 +1,6 @@
 #include <sys/time.h>
 
-/* compare t1 et t2
+/* compare t1 to t2
  * si t1 > t2 => 1
  * si t1 = t2 => 0
  * si t1 < t2 =>-1

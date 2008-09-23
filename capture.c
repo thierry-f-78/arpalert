@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 313 2006-10-16 12:54:40Z thierry $
+ * $Id: capture.c 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
@@ -20,6 +20,9 @@
 #if (__Linux__ || __FreeBSD__ || __NetBSD__ || __OpenBSD__)
 #    include <sys/sysctl.h>
 #endif
+#if (__sun)
+#    include <sys/sockio.h>
+#endif
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -29,7 +32,7 @@
 #include <net/if_arp.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
-#if (__NetBSD__ || __FreeBSD__ || __OpenBSD__)
+#if (__NetBSD__ || __FreeBSD__ || __OpenBSD__ || __sun )
 #    include <net/if_dl.h>
 #endif
 #include <arpa/inet.h>
@@ -43,15 +46,27 @@
 #include "alerte.h"
 #include "sens_timeouts.h"
 #include "loadmodule.h"
+#include "logalert.h"
+#include "macname.h"
 #include "func_time.h"
 #include "func_str.h"
 
 #define SNAP_LEN 1514
 
+#define FLAG_IPCHG      0x00000001 // 0
+#define FLAG_ALLOW      0x00000002 // 1
+#define FLAG_DENY       0x00000004 // 2
+#define FLAG_NEW        0x00000008 // 3
+#define FLAG_UNAUTH_RQ  0x00000010 // 4
+#define FLAG_ABUS       0x00000020 // 5
+#define FLAG_BOGON      0x00000040 // 6
+#define FLAG_FLOOD      0x00000080 // 7
+#define FLAG_NEWMAC     0x00000100 // 8
+#define FLAG_MACCHG     0x00000200 // 9
+
 extern int errno;
 
 // constantes
-//const char mac_empty[]  = "00:00:00:00:00:00";
 struct ether_addr null_mac = { { 0, 0, 0, 0, 0, 0 } };
 struct in_addr null_ip = { .s_addr = 0 };
 struct in_addr broadcast = { .s_addr = 0xffffffff };
@@ -68,6 +83,28 @@ struct timeval last_count;
 
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 
+// alert bitfiels
+U_INT32_T alert_bitfield;
+U_INT32_T mod_bitfield;
+U_INT32_T log_bitfield;
+
+// convert alert flag to alert number
+int flag_to_no(U_INT32_T flag){
+	switch(flag){
+		case FLAG_IPCHG:     return 0; break;
+		case FLAG_ALLOW:     return 1; break;
+		case FLAG_DENY:      return 2; break;
+		case FLAG_NEW:       return 3; break;
+		case FLAG_UNAUTH_RQ: return 4; break;
+		case FLAG_ABUS:      return 5; break;
+		case FLAG_BOGON:     return 6; break;
+		case FLAG_FLOOD:     return 7; break;
+		case FLAG_NEWMAC:    return 8; break;
+		case FLAG_MACCHG:    return 9; break;
+	}
+	return -1;
+}
+
 pcap_t *cap_init_device(struct capt *cap_id){
 	char err[PCAP_ERRBUF_SIZE];
 	char filtre[1024];
@@ -75,12 +112,19 @@ pcap_t *cap_init_device(struct capt *cap_id){
 	int promisc;
 	pcap_t *idcap;
 
-#if defined(__linux__)
+#if (__sun)
+	int sock_fd;
+	struct arpreq ar;
+	struct sockaddr_in *soap,*soap2;
+	struct lifreq ifr;
+#endif
+
+#if (__linux__)
 	int sock_fd;
 	struct ifreq ifr;
 #endif
 
-#if defined(__NetBSD__)||defined(__FreeBSD__)||defined(__OpenBSD__)
+#if (__NetBSD__ || __FreeBSD__ || __OpenBSD__)
 	int mib[6], len;
 	char *buf;
 	unsigned char *ptr;
@@ -89,43 +133,78 @@ pcap_t *cap_init_device(struct capt *cap_id){
 #endif
 
 	// find my arp adresses for this device
-#if defined(__linux__)
+#if (__sun)
 	if((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){
-		logmsg(LOG_ERR, "[%s %i] Error in socket creation",
-		                __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] socket[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
+		exit(1);
+	}
+
+	// get ip addr
+	memset(&ifr, 0, sizeof(ifr));
+	strncpy(ifr.lifr_name, cap_id->device, LIFNAMSIZ);
+	if(ioctl(sock_fd, SIOCGLIFADDR, &ifr) == -1 ){
+		logmsg(LOG_ERR, "[%s %i] ioctl[%d] : %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
+		exit(1);
+	}
+
+	soap=(struct sockaddr_in *)&(ifr.lifr_addr);
+	soap2=(struct sockaddr_in *)&(ar.arp_pa);
+	*soap2 = *soap;
+
+	// get mac addr
+	if(ioctl(sock_fd, SIOCGARP, &ar) < 0){
+		logmsg(LOG_ERR, "[%s %i] ioctl[%d] : %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
+		exit(1);
+	}
+
+	DATA_CPY(&(cap_id->mac), &(ar.arp_ha.sa_data));
+	close(sock_fd);
+#endif // (__sun)
+
+#if (__linux__)
+	if((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){
+		logmsg(LOG_ERR, "[%s %i] socket[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	memset(&ifr, 0, sizeof(ifr));
-	strncpy (ifr.ifr_name, cap_id->device, sizeof(ifr.ifr_name));
-	if (ioctl(sock_fd, SIOCGIFHWADDR, &ifr) == -1 ) {
-		logmsg(LOG_ERR, "[%s %i] Error in ioctl call",
-		                __FILE__, __LINE__);
+	strncpy(ifr.ifr_name, cap_id->device, sizeof(ifr.ifr_name));
+	if(ioctl(sock_fd, SIOCGIFHWADDR, &ifr) == -1 ){
+		logmsg(LOG_ERR, "[%s %i] ioctl[%d] : %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	DATA_CPY(&(cap_id->mac), &ifr.ifr_addr.sa_data);
-#endif // defined(__linux__)
+	close(sock_fd);
+#endif // (__linux__)
 
-#if defined(__NetBSD__)||defined(__FreeBSD__)||defined(__OpenBSD__)
+#if (__NetBSD__ || __FreeBSD__ || __OpenBSD__)
 	mib[0] = CTL_NET;
 	mib[1] = AF_ROUTE;
 	mib[2] = 0;
 	mib[3] = AF_LINK;
 	mib[4] = NET_RT_IFLIST;
 	if ((mib[5] = if_nametoindex(cap_id->device)) == 0) {
-		logmsg(LOG_ERR, "[%s %i] if_nametoindex error",
-		                __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] if_nametoindex[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0) {
-		logmsg(LOG_ERR, "[%s %i] sysctl 1 error", __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] sysctl[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	if ((buf = malloc(len)) == NULL) {
-		logmsg(LOG_ERR, "[%s %i] malloc error", __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] malloc[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
-		logmsg(LOG_ERR, "[%s %i] sysctl 2 error", __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] sysctl[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	ifm = (struct if_msghdr *)buf;
@@ -133,14 +212,7 @@ pcap_t *cap_init_device(struct capt *cap_id){
 	ptr = (unsigned char *)LLADDR(sdl);
 	DATA_CPY(&(cap_id->mac), ptr);
 	free(buf);
-#endif // (__NetBSD__)||defined(__FreeBSD__)||defined(__OpenBSD__)
-
-	// generate filter
-	if(config[CF_ONLY_ARP].valeur.integer == TRUE){
-		sprintf(filtre, "arp or rarp");
-	} else {
-		*filtre = 0;
-	}
+#endif // (__NetBSD__ || __FreeBSD__ || __OpenBSD__)
 
 	// promiscuous mode ?
 	if(config[CF_PROMISC].valeur.integer==TRUE){
@@ -150,35 +222,45 @@ pcap_t *cap_init_device(struct capt *cap_id){
 	}
 	
 	// interface initialization 
-	idcap = pcap_open_live(cap_id->device, SNAP_LEN, promisc, 0, err);
+	idcap = pcap_open_live(cap_id->device, SNAP_LEN, promisc, 10, err);
 	if(idcap == NULL){
 		logmsg(LOG_ERR, "[%s %i] pcap_open_live error: %s",
 		       __FILE__, __LINE__, err);
 		exit(1);
 	}
 
+	// check type of link
 	if(pcap_datalink(idcap) != DLT_EN10MB){
-		logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: unrecognized link",
+		logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: "
+		       "unrecognized link",
 		       __FILE__, __LINE__);
 		exit(1);
 	}
 	
-	/* initilise le filtre: */
-	if(pcap_compile(idcap, &bp, filtre, 0x100, /*maskp*/ 0) < 0){
+	// generate filter
+	if(config[CF_ONLY_ARP].valeur.integer == TRUE){
+		sprintf(filtre, "arp or rarp");
+	} else {
+		*filtre = 0;
+	}
+
+	// filter initiliazation
+	if(pcap_compile(idcap, &bp, filtre, 0x100, 0) < 0){
 		logmsg(LOG_ERR, "[%s %i] pcap_compile error: %s",
 		       __FILE__, __LINE__, pcap_geterr(idcap));
 		exit(1);
 	}
 
-	/* appliquer le filtre: */
+	// filter application
 	if(pcap_setfilter(idcap, &bp)<0){
 		logmsg(LOG_ERR, "[%s %i] pcap_setfilter error: %s",
 			__FILE__, __LINE__, pcap_geterr(idcap));
 		exit(1);
 	}
+
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] pcap_setfilter [%s]: ok",
-	       __FILE__, __LINE__, filtre);
+	logmsg(LOG_DEBUG, "[%s %i %s] pcap_setfilter [%s]: ok",
+	       __FILE__, __LINE__, __FUNCTION__, filtre);
 	#endif
 
 	return idcap;
@@ -192,6 +274,51 @@ void cap_init(void){
 	char err[PCAP_ERRBUF_SIZE];
 
 	first_capt = NULL;
+	alert_bitfield = 0;
+	mod_bitfield   = 0;
+	log_bitfield   = 0;
+
+	// init alert system
+	#define IS_CONF(x) config[x].valeur.integer == TRUE
+	if(IS_CONF(CF_LOG_FLOOD))       log_bitfield   |= FLAG_FLOOD;
+	if(IS_CONF(CF_ALERT_FLOOD))     alert_bitfield |= FLAG_FLOOD;
+	if(IS_CONF(CF_MOD_FLOOD))       log_bitfield   |= FLAG_FLOOD;
+
+	if(IS_CONF(CF_LOG_NEWMAC))      log_bitfield   |= FLAG_NEWMAC;
+	if(IS_CONF(CF_ALERT_NEWMAC))    alert_bitfield |= FLAG_NEWMAC;
+	if(IS_CONF(CF_MOD_NEWMAC))      log_bitfield   |= FLAG_NEWMAC;
+
+	if(IS_CONF(CF_LOG_NEW))         log_bitfield   |= FLAG_NEW;
+	if(IS_CONF(CF_ALERT_NEW))       alert_bitfield |= FLAG_NEW;
+	if(IS_CONF(CF_MOD_NEW))         log_bitfield   |= FLAG_NEW;
+
+	if(IS_CONF(CF_LOG_MACCHG))      log_bitfield   |= FLAG_MACCHG;
+	if(IS_CONF(CF_ALERT_MACCHG))    alert_bitfield |= FLAG_MACCHG;
+	if(IS_CONF(CF_MOD_MACCHG))      log_bitfield   |= FLAG_MACCHG;
+
+	if(IS_CONF(CF_LOG_IPCHG))       log_bitfield   |= FLAG_IPCHG;
+	if(IS_CONF(CF_ALERT_IPCHG))     alert_bitfield |= FLAG_IPCHG;
+	if(IS_CONF(CF_MOD_IPCHG))       log_bitfield   |= FLAG_IPCHG;
+
+	if(IS_CONF(CF_LOG_UNAUTH_RQ))   log_bitfield   |= FLAG_UNAUTH_RQ;
+	if(IS_CONF(CF_ALERT_UNAUTH_RQ)) alert_bitfield |= FLAG_UNAUTH_RQ;
+	if(IS_CONF(CF_MOD_UNAUTH_RQ))   log_bitfield   |= FLAG_UNAUTH_RQ;
+
+	if(IS_CONF(CF_LOG_BOGON))       log_bitfield   |= FLAG_BOGON;
+	if(IS_CONF(CF_ALERT_BOGON))     alert_bitfield |= FLAG_BOGON;
+	if(IS_CONF(CF_MOD_BOGON))       log_bitfield   |= FLAG_BOGON;
+
+	if(IS_CONF(CF_LOG_ABUS))        log_bitfield   |= FLAG_ABUS;
+	if(IS_CONF(CF_ALERT_ABUS))      alert_bitfield |= FLAG_ABUS;
+	if(IS_CONF(CF_MOD_ABUS))        log_bitfield   |= FLAG_ABUS;
+
+	if(IS_CONF(CF_LOG_ALLOW))       log_bitfield   |= FLAG_ALLOW;
+	if(IS_CONF(CF_ALERT_ALLOW))     alert_bitfield |= FLAG_ALLOW;
+	if(IS_CONF(CF_MOD_ALLOW))       log_bitfield   |= FLAG_ALLOW;
+
+	if(IS_CONF(CF_LOG_DENY))        log_bitfield   |= FLAG_DENY;
+	if(IS_CONF(CF_ALERT_DENY))      alert_bitfield |= FLAG_DENY;
+	if(IS_CONF(CF_MOD_DENY))        log_bitfield   |= FLAG_DENY;
 
 	// if no device specified, auto select the first
 	if(config[CF_IF].valeur.string == NULL ||
@@ -205,9 +332,8 @@ void cap_init(void){
 
 		netif = malloc(sizeof(struct capt));
 		if(netif == NULL){
-			logmsg(LOG_ERR,
-			       "[%s %i] malloc: %s",
-			       __FILE__, __LINE__, strerror(errno));
+			logmsg(LOG_ERR, "[%s %i] malloc[%d]: %s",
+			       __FILE__, __LINE__, errno, strerror(errno));
 			exit(1);
 		}
 		netif->next = NULL;
@@ -237,9 +363,8 @@ void cap_init(void){
 				// generate node for interfaces chain and init interface
 				netif = malloc(sizeof(struct capt));
 				if(netif == NULL){
-					logmsg(LOG_ERR,
-					       "[%s %i] malloc: %s",
-					       __FILE__, __LINE__, strerror(errno));
+					logmsg(LOG_ERR, "[%s %i] malloc[%d]: %s",
+					       __FILE__, __LINE__, errno, strerror(errno));
 					exit(1);
 				}
 				netif->device = strdup(device);
@@ -255,7 +380,7 @@ void cap_init(void){
 			}
 
 			else if(*parse == 0){
-				logmsg(LOG_ERR, "Error when parsing device: \"%s\"\n", 
+				logmsg(LOG_ERR, "Error when parsing device: \"%s\"", 
 				       config[CF_IF].valeur.string);
 				exit(1);
 			}
@@ -298,7 +423,6 @@ int cap_gen_bitfield(fd_set *bf){
 		if(fd > max) max = fd;
 		netif = netif->next;
 	}
-
 	return(max);
 }
 
@@ -310,8 +434,7 @@ void cap_sniff(fd_set *bf){
 	while(netif != NULL){
 		if(FD_ISSET(pcap_fileno(netif->pcap), bf)){
 			if(pcap_dispatch(netif->pcap, 1, callback, (void*)netif) < 0){
-				logmsg(LOG_ERR,
-				       "[%s %i] pcap_dispatch error: %s",
+				logmsg(LOG_ERR, "[%s %i] pcap_dispatch error: %s",
 				       __FILE__, __LINE__,
 				       pcap_geterr(netif->pcap));
 			}
@@ -319,48 +442,6 @@ void cap_sniff(fd_set *bf){
 		netif = netif->next;
 	}
 }
-
-// convert eth mac sender to string
-#define STR_ETH_MAC_SENDER \
-	if(flag_str_eth_mac_sender == FALSE){ \
-		MAC_TO_STR(eth_mac_sender[0], str_eth_mac_sender); \
-		flag_str_eth_mac_sender = TRUE; \
-	}
-
-// convert eth mac rcpt to string
-#define STR_ETH_MAC_RCPT \
-	if(flag_str_eth_mac_rcpt == FALSE){ \
-		MAC_TO_STR(eth_mac_rcpt[0], str_eth_mac_rcpt); \
-		flag_str_eth_mac_rcpt = TRUE; \
-	}
-
-// convert arp mac sender to sting
-#define STR_ARP_MAC_SENDER \
-	if(flag_str_arp_mac_sender == FALSE){ \
-		MAC_TO_STR(arp_mac_sender[0], str_arp_mac_sender); \
-		flag_str_arp_mac_sender = TRUE;	\
-	}	
-
-// convert arp mac sender to sting
-#define STR_ARP_MAC_RCPT \
-	if(flag_str_arp_mac_rcpt == FALSE){ \
-		MAC_TO_STR(arp_mac_rcpt[0], str_arp_mac_rcpt); \
-		flag_str_arp_mac_rcpt= TRUE;	\
-	}	
-
-// convert arp ip sender into string
-#define STR_ARP_IP_SENDER \
-	if(flag_str_arp_ip_sender == FALSE){ \
-		strcpy(str_arp_ip_sender, inet_ntoa(arp_ip_sender)); \
-		flag_str_arp_ip_sender = TRUE; \
-	}
-
-// convert arp ip rcpt into string
-#define STR_ARP_IP_RCPT \
-	if(flag_str_arp_ip_rcpt == FALSE){ \
-		strcpy(str_arp_ip_rcpt, inet_ntoa(arp_ip_rcpt)); \
-		flag_str_arp_ip_rcpt = TRUE; \
-	}
 
 // return TRUE if the alert interval is ok
 int interval_ok(struct timeval *tv){
@@ -373,76 +454,105 @@ int interval_ok(struct timeval *tv){
 	return FALSE;
 }
 
+// centralized alerts system
+void send_alert(struct ether_addr *mac_sender,
+                struct in_addr ip_sender,
+                U_INT32_T flag,
+                struct ether_addr *ref_mac,
+                struct in_addr ref_ip,
+                char *interface){
+	int alert_no;
+	char str_ref[18];
+	char str_eth_mac_sender[18];
+	char str_arp_ip_sender[16];
+	char *vendor = NULL;
+
+	// convert alert flag into alert number
+	alert_no = flag_to_no(flag);
+
+	if((alert_bitfield & flag) != 0x000000 ||
+	   (log_bitfield & flag) != 0x000000){
+
+		// convert eth mac sender to string
+		MAC_TO_STR(*mac_sender, &str_eth_mac_sender[0]);
+
+		// convert arp ip sender into string
+		strcpy(str_arp_ip_sender, inet_ntoa(ip_sender));
+
+		// convert references
+	   switch(alert_no){
+	      case 0:
+	      case 4:
+				strcpy(str_ref, inet_ntoa(ref_ip));
+				break;
+
+	      case 6:
+	      case 9:
+				MAC_TO_STR(*ref_mac, str_ref);
+				break;
+
+			default:
+				str_ref[0] = 0;
+				break;
+	   }
+	}
+
+	// get vendor
+	vendor = get_vendor(mac_sender);
+
+
+	// send alert script
+	if((alert_bitfield & flag) != 0x000000){
+		alerte_script(str_eth_mac_sender, str_arp_ip_sender, alert_no,
+		              str_ref, interface, vendor); 
+	}
+
+	// send alert module
+	if((mod_bitfield & flag) != 0x000000){
+		alerte_mod(mac_sender, ip_sender, alert_no,
+		           ref_mac, ref_ip, interface, vendor);
+	}
+
+	// send alert log
+	if((log_bitfield & flag) != 0x000000){
+		alerte_log(seq,
+		           str_eth_mac_sender, str_arp_ip_sender,
+		           alert_no, NULL, interface, vendor);
+	}
+}
+
+// processing arp errors
 void callback(u_char *user, const struct pcap_pkthdr *h,
                             const u_char *buff){
-	char m_eth_mac_sender[18];
-	char m_eth_mac_rcpt[18];
-	char m_arp_mac_sender[18];
-	char m_arp_mac_rcpt[18];
-	char m_arp_ip_sender[16];
-	char m_arp_ip_rcpt[16];
-
 	int flag_is_arp = FALSE;
+	struct ether_addr __eth_mac_sender;
+	struct ether_addr __eth_mac_rcpt;
 	struct ether_addr *eth_mac_sender = (struct ether_addr *)&null_mac;
 	struct ether_addr *eth_mac_rcpt   = (struct ether_addr *)&null_mac;
+	struct ether_addr __arp_mac_sender;
+	struct ether_addr __arp_mac_rcpt;
 	struct ether_addr *arp_mac_sender = (struct ether_addr *)&null_mac;
 	struct ether_addr *arp_mac_rcpt   = (struct ether_addr *)&null_mac;
 	struct in_addr arp_ip_sender = { .s_addr = 0x00000000 };
 	struct in_addr arp_ip_rcpt   = { .s_addr = 0x00000000 };
 	struct data_pack *eth_data = NULL;
 	struct data_pack *ip_data  = NULL;
-	char *str_eth_mac_sender = m_eth_mac_sender;
-	char *str_eth_mac_rcpt   = m_eth_mac_rcpt;
-	char *str_arp_mac_sender = m_arp_mac_sender;
-	char *str_arp_mac_rcpt   = m_arp_mac_rcpt;
-	char *str_arp_ip_sender  = m_arp_ip_sender;
-	char *str_arp_ip_rcpt    = m_arp_ip_rcpt;
-	int flag_str_eth_mac_sender = FALSE;
-	int flag_str_eth_mac_rcpt   = FALSE;
-	int flag_str_arp_mac_sender = FALSE;
-	int flag_str_arp_mac_rcpt   = FALSE;
-	int flag_str_arp_ip_sender  = FALSE; 
-	int flag_str_arp_ip_rcpt    = FALSE;
 	int flag_unknown_address    = TRUE;
 	struct capt *cap_id= (struct capt *)user;
 	struct timeval sous;
+
+	// string conversions
+	char str_eth_mac_sender[18];
+	char str_eth_mac_rcpt[18];
+	char str_arp_mac_sender[18];
+	char str_arp_mac_rcpt[18];
+	char str_arp_ip_sender[16];
+	char str_arp_ip_rcpt[16];
 
 	// inter
 	struct ether_header * eth_header;
 	struct arphdr * arp_header;
 	struct timeval res;
-
-	// for dump;
-	char ip_tmp[16];
-	char mac_tmp[18];
-
-	// if dump paquet is active
-	#ifdef DEBUG_DUMP
-	{
-		char strdump[160];
-		int i;
-		char *c;
-	
-		i = 0;
-		bzero(strdump, 160);
-		c = strdump;
-		while(i < 53){
-			if(i % 6 == 0 && i != 0){
-				*(c - 1) = 0;
-				logmsg(LOG_DEBUG, "%s", strdump);
-				bzero(strdump, 160);
-				c = strdump;
-			}
-			sprintf(c, "%02x", buff[i]);
-			c += 2;
-			*c = ' ';
-			c++;
-			i++;
-		}
-		*(c - 1) = 0;
-		logmsg(LOG_DEBUG, "%s", strdump);
-	}
-	#endif
 
 	// if more than N arp request in one second,
 	// dont execute capture functions
@@ -463,10 +573,14 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 	eth_header = (struct ether_header *)buff;
 
 	// get a ethernet mac source
-	eth_mac_sender = (struct ether_addr *)&(eth_header->ether_shost);
+	// eth_mac_sender = (struct ether_addr *)&(eth_header->ether_shost);
+	memcpy(&__eth_mac_sender, &(eth_header->ether_shost), 6);
+	eth_mac_sender = &__eth_mac_sender;
 
 	// get a ethernet mac dest
-	eth_mac_rcpt = (struct ether_addr *)&(eth_header->ether_dhost);
+	//eth_mac_rcpt = (struct ether_addr *)&(eth_header->ether_dhost);
+	memcpy(&__eth_mac_rcpt, &(eth_header->ether_dhost), 6);
+	eth_mac_rcpt = &__eth_mac_rcpt;
 
 	// get properties memorised of this mac
 	eth_data = data_exist(eth_mac_sender, cap_id);
@@ -505,34 +619,56 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		                sizeof(struct arphdr));
 
 		// get arp mac sender
-		// arp_mac_sender = (struct ether_addr *)&buff[base + 1];
-		arp_mac_sender = (struct ether_addr *)arp_data_base;
+		//arp_mac_sender = (struct ether_addr *)arp_data_base;
+		memcpy(&__arp_mac_sender, arp_data_base, arp_header->ar_hln);
+		arp_mac_sender = &__arp_mac_sender;
 
 		// base = sender IP address
 		arp_data_base += arp_header->ar_hln;
 
 		// get ip of arp sender
-		arp_ip_sender.s_addr = *(U_INT32_T *)arp_data_base;
+		//arp_ip_sender.s_addr = *(U_INT32_T *)arp_data_base;
+		memcpy(&arp_ip_sender.s_addr, arp_data_base, arp_header->ar_pln);
 	
+		// base = target mac address
+		arp_data_base += arp_header->ar_pln;
+
+		// get arp mac rcpt
+		memcpy(&__arp_mac_rcpt, arp_data_base, arp_header->ar_hln);
+		arp_mac_rcpt = &__arp_mac_rcpt;
+
 		// base = target IP address
-		arp_data_base += ( arp_header->ar_pln + arp_header->ar_hln );
+		arp_data_base += arp_header->ar_hln;
 		
 		// get ip of arp rcpt
-		arp_ip_rcpt.s_addr = *(U_INT32_T *)arp_data_base;
+		//arp_ip_rcpt.s_addr = *(U_INT32_T *)arp_data_base;
+		memcpy(&arp_ip_rcpt.s_addr, arp_data_base, arp_header->ar_pln);
 
 		if(config[CF_DUMP_PAQUET].valeur.integer == TRUE){
+
+			// convert eth mac sender to string
+			MAC_TO_STR(eth_mac_sender[0], str_eth_mac_sender);
+
+			// convert eth mac rcpt to string
+			MAC_TO_STR(eth_mac_rcpt[0], str_eth_mac_rcpt);
+
+			// convert arp mac sender to sting
+			MAC_TO_STR(arp_mac_sender[0], str_arp_mac_sender);
+
+			// convert arp mac sender to sting
+			MAC_TO_STR(arp_mac_rcpt[0], str_arp_mac_rcpt);
+
+			// convert arp ip sender into string
+			strcpy(str_arp_ip_sender, inet_ntoa(arp_ip_sender));
+
+			// convert arp ip rcpt into string
+			strcpy(str_arp_ip_rcpt, inet_ntoa(arp_ip_rcpt));
+
 			if(ntohs(arp_header->ar_op) == ARPOP_REQUEST) {
-				STR_ETH_MAC_SENDER
-				STR_ETH_MAC_RCPT
-				STR_ARP_MAC_SENDER
-				STR_ARP_MAC_RCPT
-				STR_ARP_IP_SENDER
-				STR_ARP_IP_RCPT
 
 				logmsg(LOG_DEBUG, 
-				       "[%s %d] %s > %s, "
+				       "%s > %s, "
 				       "length %d: arp who-has %s tell %s",
-						 __FILE__, __LINE__,
 				       str_eth_mac_sender,
 				       str_eth_mac_rcpt,
 				       h->len,
@@ -541,17 +677,10 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 			}
 
 			else if(ntohs(arp_header->ar_op) == ARPOP_REPLY) {
-				STR_ETH_MAC_SENDER
-				STR_ETH_MAC_RCPT
-				STR_ARP_MAC_SENDER
-				STR_ARP_MAC_RCPT
-				STR_ARP_IP_SENDER
-				STR_ARP_IP_RCPT
 	
 				logmsg(LOG_DEBUG, 
-				       "[%s %d] %s > %s, "
+				       "%s > %s, "
 						 "length %d: arp reply %s is-at %s",
-						 __FILE__, __LINE__,
 				       str_eth_mac_sender,
 				       str_eth_mac_rcpt,
 						 h->len,
@@ -580,23 +709,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		logmsg(LOG_DEBUG, "[%s %d]  -> DETECTED", __FILE__, __LINE__);
 		#endif
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-		STR_ARP_IP_RCPT
-		
-		if(config[CF_LOG_FLOOD].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, type=flood, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       cap_id->device);
-		}
-		if(config[CF_ALERT_FLOOD].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 7);
-		}
-		if(config[CF_MOD_FLOOD].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 7,
-			           &null_mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_FLOOD,
+		           &null_mac, null_ip, cap_id->device);
 		return;
 	}
 		
@@ -626,21 +740,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		// allow to dump data
 		data_rqdump();
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-		
-		if(config[CF_LOG_NEWMAC].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, type=new_mac, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       cap_id->device);
-		}
-		if(config[CF_ALERT_NEWMAC].valeur.integer == TRUE){	
-			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 8);
-		}
-		if(config[CF_MOD_NEWMAC].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 8, &null_mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_NEWMAC,
+		           &null_mac, null_ip, cap_id->device);
 	}
 
 	// =====================================
@@ -664,7 +765,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		)
 	) {
 		#ifdef DEBUG_DETECT
-		logmsg(LOG_DEBUG, "[%s %d] DETECTED", __FILE__, __LINE__);
+		logmsg(LOG_DEBUG, "[%s %d]  -> DETECTED", __FILE__, __LINE__);
 		#endif
 		
 		// add data to database
@@ -679,22 +780,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		// allow to dump data
 		data_rqdump();
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-
-		if(config[CF_LOG_NEW].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, type=new, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       cap_id->device);
-		}
-		if(config[CF_ALERT_NEW].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 3);
-		}
-		if(config[CF_MOD_NEW].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 3,
-			           &null_mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_NEW,
+		           &null_mac, null_ip, cap_id->device);
 	}
 	
 	// =====================================
@@ -732,10 +819,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		logmsg(LOG_DEBUG, "[%s %d]  -> DETECTED", __FILE__, __LINE__);
 		#endif
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-		MAC_TO_STR(ip_data->mac, mac_tmp);
-
 		// maj ip in database
 		unindex_ip(arp_ip_sender, cap_id);
 		eth_data->ip.s_addr = arp_ip_sender.s_addr;
@@ -744,18 +827,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		// can dump database
 		data_rqdump();
 	
-		if(config[CF_LOG_MACCHG].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_change, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       mac_tmp, cap_id->device);
-		}
-		if(config[CF_ALERT_MACCHG].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, mac_tmp, 9);
-		}
-		if(config[CF_MOD_MACCHG].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 9, &ip_data->mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_MACCHG,
+		           &ip_data->mac, null_ip, cap_id->device);
 	}
 
 	// =====================================
@@ -802,11 +875,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[0].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[0].tv_usec = current_t.tv_usec;
 					
-		// convert ip to string
-		strcpy(ip_tmp, inet_ntoa(eth_data->ip));
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-
 		// maj database
 		eth_data->ip.s_addr = arp_ip_sender.s_addr;
 		index_ip(eth_data);
@@ -814,18 +882,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		// can dump database
 		data_rqdump();
 	
-		if(config[CF_LOG_IPCHG].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       ip_tmp, cap_id->device); 
-		}	
-		if(config[CF_ALERT_IPCHG].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, ip_tmp, 0); 
-		}
-		if(config[CF_MOD_IPCHG].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 0, &null_mac, eth_data->ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_IPCHG,
+		           &null_mac, eth_data->ip, cap_id->device);
 	}
 
 	// =====================================
@@ -909,24 +967,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[4].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[4].tv_usec = current_t.tv_usec;
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-		STR_ARP_IP_RCPT
-
-		// ALERT
-		if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, "
-			                   "type=unauthrq, dev=%s", 
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       str_arp_ip_rcpt, cap_id->device);
-		}
-		if(config[CF_ALERT_UNAUTH_RQ].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, str_arp_ip_rcpt, 4);
-		}
-		if(config[CF_MOD_UNAUTH_RQ].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 4,
-			           &null_mac, arp_ip_rcpt, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_UNAUTH_RQ,
+		           &null_mac, arp_ip_rcpt, cap_id->device);
 	}
 
 	// =====================================
@@ -964,25 +1006,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[6].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[6].tv_usec = current_t.tv_usec;
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_MAC_SENDER
-		STR_ARP_IP_SENDER
-
-		if(config[CF_LOG_BOGON].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, reference=%s, "
-					 "type=mac_error, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       str_arp_mac_sender, cap_id->device);
-		}
-		if(config[CF_ALERT_BOGON].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender,
-			       str_arp_mac_sender, 6);
-		}
-		if(config[CF_MOD_BOGON].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 6,
-			           arp_mac_sender, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_BOGON,
+		           arp_mac_sender, null_ip, cap_id->device);
 	}
 
 	// =====================================
@@ -1030,22 +1055,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[5].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[5].tv_usec = current_t.tv_usec;
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-
-		if(config[CF_LOG_ABUS].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "sec=%d, mac=%s, ip=%s, type=rqabus, dev=%s", 
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       cap_id->device);
-		}
-		if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 5);
-		}	
-		if(config[CF_MOD_ABUS].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 5,
-			           &null_mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_ABUS,
+		           &null_mac, null_ip, cap_id->device);
 	}
 	
 	// =====================================
@@ -1053,7 +1064,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 	// =====================================
 	#ifdef DEBUG_DETECT
 	logmsg(LOG_DEBUG,
-	       "[%s %d]  -> \"know but not referenced in allow file\" Check ...",
+	       "[%s %d]  -> \"know but not referenced in allow file\" "
+	       "Check ...",
 	       __FILE__, __LINE__);
 	#endif
 	if(
@@ -1081,22 +1093,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[1].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[1].tv_usec = current_t.tv_usec;
 	
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-
-		if(config[CF_LOG_ALLOW].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, type=unknow_address, dev=%s", 
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       cap_id->device);
-		}
-		if(config[CF_ALERT_ALLOW].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 1); 
-		}
-		if(config[CF_MOD_ALLOW].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 1,
-			           &null_mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_ALLOW,
+		           &null_mac, null_ip, cap_id->device);
 	}
 	
 	// =====================================
@@ -1132,22 +1130,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[2].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[2].tv_usec = current_t.tv_usec;
 
-		STR_ETH_MAC_SENDER
-		STR_ARP_IP_SENDER
-
-		if(config[CF_LOG_DENY].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE,
-			       "seq=%d, mac=%s, ip=%s, type=black_listed, dev=%s",
-			       seq, str_eth_mac_sender, str_arp_ip_sender,
-			       cap_id->device);
-		}
-		if(config[CF_ALERT_DENY].valeur.integer == TRUE){
-			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 2); 
-		}
-		if(config[CF_MOD_DENY].valeur.integer == TRUE){
-			alerte_mod(eth_mac_sender, arp_ip_sender, 2,
-			           &null_mac, null_ip, cap_id->device);
-		}
+		send_alert(eth_mac_sender, arp_ip_sender, FLAG_DENY,
+		           &null_mac, null_ip, cap_id->device);
 	}
 }
 
@@ -1164,8 +1148,8 @@ void cap_abus(void){
 
 // return the next timeout
 void *cap_next(struct timeval *tv){
-	(*tv).tv_sec = next_abus_reset.tv_sec;
-	(*tv).tv_usec = next_abus_reset.tv_usec;
+	tv->tv_sec = next_abus_reset.tv_sec;
+	tv->tv_usec = next_abus_reset.tv_usec;
 	return cap_abus;
 }
 

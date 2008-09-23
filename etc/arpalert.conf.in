@@ -1,9 +1,27 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: arpalert.conf.in 313 2006-10-16 12:54:40Z thierry $
+# $Id: arpalert.conf.in 399 2006-10-29 08:09:10Z thierry $
 # 
 # Default config file
 # 
+
+# white list
+maclist file = "@config_dir@/maclist.allow"
+
+# black list
+maclist alert file = "@config_dir@/maclist.deny"
+
+# dump file
+maclist leases file = "@leases_dir@/arpalert.leases"
+
+# list of authorized request
+#auth request file = @config_dir@/authrq.conf
+
+# log file
+#log file = "@log_dir@/arpalert.log"
+
+# pid file
+lock file = "@lock_dir@/arpalert.pid"
 
 # log level
 use syslog = true
@@ -79,6 +97,12 @@ anti flood interval = 5
 # if the number of arp request in seconds exceed this value, all alerts are ignored for 
 # "anti flood interval" time
 anti flood global = 50
+
+# vendor name
+mac vendor file = "@config_dir@/oui.txt"
+log mac vendor = true
+alert mac vendor = true
+mod mac vendor = true
 
 # log if the adress is referenced in hash but is not in white list
 log referenced address = false

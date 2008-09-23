@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.c 313 2006-10-16 12:54:40Z thierry $
+ * $Id: sens.c 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
@@ -27,6 +27,10 @@
 #include "log.h"
 #include "func_str.h"
 
+#if (__sun)
+#    define INADDR_NONE ((in_addr_t)(-1))
+#endif
+
 // hash table size ; this number must be primary number
 #define HASH_SIZE 4096
 
@@ -36,11 +40,15 @@
 /* HACHAGE */
 #define SENS_HASH(x, y, z) ({ \
 	U_INT32_T a, b, c; \
-	a = (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[0]) ^ (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[4]); \
-	b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
+	a = (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[0]) ^ \
+	    (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[4]); \
+	b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ \
+	            (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
 	c = a ^ ( b >> 12 ); \
-	a = ((U_INT16_T)(y)) ^ ( ((U_INT32_T)(y)) >> 20 ) ^ ( ((U_INT8_T)(y)) >> 12 ); \
-	b = ((U_INT16_T)(z)) ^ ( ((U_INT32_T)(z)) >> 20 ) ^ ( ((U_INT8_T)(z)) >> 12 ); \
+	a = ((U_INT16_T)(y)) ^ ( ((U_INT32_T)(y)) >> 20 ) ^ \
+	                       ( ((U_INT8_T)(y)) >> 12 ); \
+	b = ((U_INT16_T)(z)) ^ ( ((U_INT32_T)(z)) >> 20 ) ^ \
+	                       ( ((U_INT8_T)(z)) >> 12 ); \
 	( a ^ b ^ c ) & 0xfff; \
 })
 
@@ -108,15 +116,14 @@ struct pqt *pqt_h[HASH_SIZE];
 /* mask list */
 struct in_addr used_masks[33];
 
-void sens_init(void) {
-	//int read_size;
-	//char *find;
-	//char current[IP_ADRESS_MAX_LEN + MASK_MAX_LEN + 2];
-	//int  current_count=0;
-	//char cur_dec = 0; // current type read: 0: null; 1: ip; 2: mac; 3: comment
-	//struct ether_addr last_mac;
-	//u_int line = 1;
-	//int flag_mask = FALSE;
+/* load data aor acls
+ * @param status:
+ *        SENS_TEST: test file
+ *        SENS_LOAD: load file
+ * @return:   0 if is ok
+ *           -1 if is not ok
+ */
+int sens_init(int status) {
 	FILE *fd;
 	char buf[BUF_SIZE];
 	char *parse;
@@ -141,20 +148,23 @@ void sens_init(void) {
 	memset(&pqt_h, 0, HASH_SIZE * sizeof(struct pqt *));
 	memset(&list_mask, -1, 33);
 
-	if(config[CF_AUTHFILE].valeur.string == NULL) {
-		return;
+	if(config[CF_AUTHFILE].valeur.string == NULL ||
+	   config[CF_AUTHFILE].valeur.string[0] == 0) {
+		return 0;
 	}
 
 	// open file
 	fd = fopen(config[CF_AUTHFILE].valeur.string, "r");
 	if(fd == NULL){
-		logmsg(LOG_ERR, "[%s %i] fopen: %s",
-		       __FILE__, __LINE__, strerror(errno));
-		exit(1);
+		logmsg(LOG_ERR, "[%s %i] fopen[%d]: %s (%s)",
+		       __FILE__, __LINE__,
+		       errno, strerror(errno),
+		       config[CF_AUTHFILE].valeur.string);
+		return -1;
 	}
 
 	// read lines
-	while(!feof(fd)){
+	while(feof(fd) == 0){
 		fgets(buf, BUF_SIZE, fd);
 		ligne++;
 
@@ -194,10 +204,11 @@ void sens_init(void) {
 				// exceed args hard limit
 				if(arg_c == MAX_CONTEXT_ARGS || arg_n == MAX_ARGS){
 					logmsg(LOG_ERR,
-					       "file: \"%s\", line %d: exceed args hard limit (%d)",
+					       "file: \"%s\", line %d: "
+					       "exceed args hard limit (%d)",
 					       config[CF_AUTHFILE].valeur.string,
 							 ligne, MAX_ARGS);
-					exit(1);
+					return -1;
 				}
 				context = 0;
 			}
@@ -210,7 +221,7 @@ void sens_init(void) {
 			       "file: \"%s\", line %d: insufficient arguments",
 			       config[CF_AUTHFILE].valeur.string,
 			       ligne);
-			exit(1);
+			return -1;
 		}
 
 		// change context
@@ -218,6 +229,13 @@ void sens_init(void) {
 		
 			// set interface
 			idcap = cap_get_interface(args[1]);
+			if(idcap == NULL){
+				logmsg(LOG_ERR,
+				       "file: \"%s\", line %d: unknown interfaces: %s",
+				       config[CF_AUTHFILE].valeur.string,
+				       ligne, args[1]);
+				exit(1);
+			}
 			
 			// set mac address
 			if(str_to_mac(args[0], &mac) == -1){
@@ -225,7 +243,7 @@ void sens_init(void) {
 				       "file: \"%s\", line %d: mac addess error",
 				       config[CF_AUTHFILE].valeur.string,
 				       ligne);
-				exit(1);
+				return -1;
 			}
 		}
 		
@@ -247,6 +265,13 @@ void sens_init(void) {
 
 			// ip
 			ip.s_addr = inet_addr(str_ip);
+			if(ip.s_addr == INADDR_NONE){
+				logmsg(LOG_ERR,
+				       "file: \"%s\", line %d: ip adress error: %s",
+				       config[CF_AUTHFILE].valeur.string,
+				       ligne, str_ip);
+				return -1;
+			}
 
 			// network address validation
 			mask = atoi(str_mask);
@@ -254,39 +279,46 @@ void sens_init(void) {
 
 			// check network validation
 			if( (ip.s_addr & binmask.s_addr) != ip.s_addr){
-				logmsg(LOG_ERR, "[%s %i] error in config file \"%s\" "
-				       "at line %d: the value %s/%u are incorrect",
-				       __FILE__, __LINE__, config[CF_AUTHFILE].valeur.string,
+				logmsg(LOG_ERR,
+				       "file: \"%s\", line %d: incorrect value %s/%u",
+				       config[CF_AUTHFILE].valeur.string,
 				       ligne, str_ip, str_mask);
-				exit(1);
+				return -1;
 			}
 
 			// add this network value in hash
-			sens_add(&mac, ip, binmask, idcap);
+			if(status == SENS_LOAD){
+				sens_add(&mac, ip, binmask, idcap);
+			}
 
 			i++;
 		}
-		
-		/*
-		ligne = 0;
-		while(ligne < arg_n){
-			printf("%s\n", args[ligne]);
-			ligne++;
-		}
-		printf("\n");
-		*/
 	}
 
-	fclose(fd);
+	// close
+	if(fclose(fd) == EOF){
+		logmsg(LOG_ERR, "[%s %d] fclose[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
+		exit(1);
+	}
+
+	// end of function if only file is tested
+	if(status == SENS_TEST){
+		return 0;
+	}
 	
 	// sort list_mask
-	for(i=0; i<32; i++){
-		for(j=32; j>i; j--){
+	// algo bubble sort
+	i = 0;
+	while(i < 32){
+		j = 32;
+		while(j > i){
 			if(list_mask[j] > list_mask[j-1]){
 				sort_tmp = list_mask[j-1];
 				list_mask[j-1] = list_mask[j];
 				list_mask[j] = sort_tmp;
 			}
+			j--;
 		}
 		// convert decimal mask to binary mask
 		if(list_mask[i] != -1){
@@ -294,7 +326,10 @@ void sens_init(void) {
 		} else {
 			used_masks[i].s_addr = END_OF_MASKS;
 		}
+		i++;
 	}
+
+	return 0;
 }
 
 // add data to hash
@@ -305,8 +340,8 @@ void sens_add(struct ether_addr *mac, struct in_addr ipb,
 
 	mpqt = (struct pqt *)malloc(sizeof(struct pqt));
 	if(mpqt == NULL){
-		logmsg(LOG_ERR, "[%s %d] allocation memory error",
-		       __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %d] malloc[%d]: %s",
+		       __FILE__, __LINE__, errno, strerror(errno));
 		exit(1);
 	}
 	DATA_CPY(&mpqt->mac, mac);
@@ -325,7 +360,8 @@ void sens_free(void){
 	struct pqt *free_pqt;
 	struct pqt *current_pqt;
 
-	for(i=0; i<HASH_SIZE; i++){
+	i = 0;
+	while(i < HASH_SIZE){
 		current_pqt = pqt_h[i];
 		while(current_pqt != NULL){
 			free_pqt = current_pqt;
@@ -333,12 +369,22 @@ void sens_free(void){
 			free(free_pqt);
 		}
 		pqt_h[i] = NULL;
+		i++;
 	}
 }
 
 void sens_reload(void){
+	int retval;
+
+	retval = sens_init(SENS_TEST);
+	if(retval == -1){
+		logmsg(LOG_ERR,
+		       "errors in file \"%s\": not reload",
+		       config[CF_AUTHFILE].valeur.string);
+		return;
+	}
 	sens_free();
-	sens_init();
+	sens_init(SENS_LOAD);
 }
 
 int sens_exist(struct ether_addr *mac,
@@ -349,19 +395,19 @@ int sens_exist(struct ether_addr *mac,
 	struct in_addr ip;
 
 	// test all masks
-	while((*masks).s_addr != END_OF_MASKS){
+	while(masks->s_addr != END_OF_MASKS){
 		
 		// apply mask
-		ip.s_addr = ipb.s_addr & (*masks).s_addr;
+		ip.s_addr = ipb.s_addr & masks->s_addr;
 
 		// get data in hash
-		h = SENS_HASH(mac, ip.s_addr, (*masks).s_addr);
+		h = SENS_HASH(mac, ip.s_addr, masks->s_addr);
 		spqt = pqt_h[h];
 
 		// find data
 		while(spqt != NULL){
 			if(spqt->ip_d.s_addr == ip.s_addr &&
-			   spqt->mask.s_addr == (*masks).s_addr &&
+			   spqt->mask.s_addr == masks->s_addr &&
 			   DATA_CMP(&spqt->mac, mac) == 0 ){
 				return(TRUE);
 			}

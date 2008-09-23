@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens_timeouts.c 313 2006-10-16 12:54:40Z thierry $
+ * $Id: sens_timeouts.c 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
@@ -109,8 +109,7 @@ void sens_timeout_add(struct ether_addr *mac, struct in_addr ipb,
 	// get free timeout node
 	if(free_start->next_chain == free_start){
 		logmsg(LOG_WARNING,
-		       "[%s %d] No authorized request detection timeout "
-				 "avalaible, more than %d timeouts currently used",
+		       "[%s %d] Timeouts table full: more than %d timeouts used",
 		       __FILE__, __LINE__, MAX_DATA);
 		return;
 	}
@@ -143,7 +142,7 @@ void sens_timeout_add(struct ether_addr *mac, struct in_addr ipb,
 	new_tmout->next_chain = used_start;
 }
 
-// check if entrie are in timeout
+// check if entry is present in timeout hash
 int sens_timeout_exist(struct ether_addr *mac, struct in_addr ipb,
                        struct capt *idcap){
 	int hash;
@@ -158,7 +157,7 @@ int sens_timeout_exist(struct ether_addr *mac, struct in_addr ipb,
 	while(find != base){
 		if(find->ip_d.s_addr == ipb.s_addr &&
 		   find->idcap == idcap &&
-		   DATA_CMP(&(find->mac), mac) == 0){
+		   DATA_CMP(&(find->mac), mac) == DATA_EQUAL){
 			return(TRUE);
 		}
 		find = find->next_hash;
@@ -173,28 +172,36 @@ void sens_timeout_clean(void) {
 
 	look = used_start->next_chain;
 
-	while(look != used_start && 
-	      time_comp(&current_t, &(look->last)) == BIGEST){
+	while(look != used_start){ 
 
-		// get next
-		look_next = look->next_chain;
+		// if entry expires
+		if(time_comp(&current_t, &(look->last)) == BIGEST){
 
-		// delete from hash
-		look->prev_hash->next_hash = look->next_hash;
-		look->next_hash->prev_hash = look->prev_hash;
+			// get next
+			look_next = look->next_chain;
+
+			// delete from hash
+			look->prev_hash->next_hash = look->next_hash;
+			look->next_hash->prev_hash = look->prev_hash;
 		
-		// delete from used list
-		look->prev_chain->next_chain = look->next_chain;
-		look->next_chain->prev_chain = look->prev_chain;
+			// delete from used list
+			look->prev_chain->next_chain = look->next_chain;
+			look->next_chain->prev_chain = look->prev_chain;
 		
-		// move the structur in free
-		free_start->next_chain->prev_chain = look;
-		look->next_chain = free_start->next_chain;
-		free_start->next_chain = look;
-		look->prev_chain = free_start;
+			// move the structur in free
+			free_start->next_chain->prev_chain = look;
+			look->next_chain = free_start->next_chain;
+			free_start->next_chain = look;
+			look->prev_chain = free_start;
 
-		// set next
-		look = look_next;
+			// set next
+			look = look_next;
+		}
+
+		// else quit (the entry are sorted by expiration date)
+		else {
+			return;
+		}
 	}
 }
 

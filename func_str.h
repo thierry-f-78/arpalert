@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: func_str.h 313 2006-10-16 12:54:40Z  $
+ * $Id: func_str.h 399 2006-10-29 08:09:10Z  $
  *
  */
 
@@ -26,6 +26,12 @@
 	        (a).ETHER_ADDR_OCTET[3], \
 	        (a).ETHER_ADDR_OCTET[4], \
 	        (a).ETHER_ADDR_OCTET[5])
+
+// convert hex string to int
+//   @param: hexa string terminated by \0
+//   @return: hexa int conv
+//            -1: error
+int strhex_to_int(char *hex);
 
 // translate string data mac to binary data mac
 // return -1 if error

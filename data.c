@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 313 2006-10-16 12:54:40Z thierry $
+ * $Id: data.c 405 2006-10-29 08:27:22Z thierry $
  *
  */
 
@@ -25,7 +25,6 @@
 #include "func_str.h"
 
 // hash table size (must be a primary number)
-//#define HASH_SIZE 1999
 #define HASH_SIZE 4096
 
 // actual number of datas
@@ -34,7 +33,7 @@ unsigned int data_size;
 extern int errno;
 
 //unsigned int data_mac_hash(data_mac *mac);
-// retourn un resultat sur 12 bits
+// return un resultat sur 12 bits
 #define DATA_MAC_HASH(x) ({ \
    U_INT32_T a, b; \
 	a = (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[0]) ^ \
@@ -45,7 +44,7 @@ extern int errno;
 })
 
 //unsigned int data_ip_hash(data_mac *mac);
-// retourn un resultat sur 12 bits
+// return un resultat sur 12 bits
 #define DATA_IP_HASH(x) ({ \
 	U_INT32_T a, b, c; \
 	a = (U_INT16_T)(x) & 0xfff; \
@@ -96,19 +95,19 @@ void data_init(void){
 	
 	data_size = 0;
 
-	// compute mask of allowed data dump
-	dump_mask =	config[CF_DMPBL].valeur.integer * DENY +
-	            config[CF_DMPWL].valeur.integer * ALLOW +
-	            config[CF_DMPAPP].valeur.integer * APPEND;
+	// init timeout chain
+	timeouts->next_chain = timeouts;
+	timeouts->prev_chain = timeouts;
 
 	// set next dump
 	dump_time.tv_sec = -1;
 	// set last dump
 	last_dump.tv_sec = -1;
 
-	// init timeout chain
-	timeouts->next_chain = timeouts;
-	timeouts->prev_chain = timeouts;
+	// compute mask of allowed data dump
+	dump_mask = config[CF_DMPBL].valeur.integer * DENY +
+	            config[CF_DMPWL].valeur.integer * ALLOW +
+	            config[CF_DMPAPP].valeur.integer * APPEND;
 }
 
 // index timeouts
@@ -131,17 +130,12 @@ void index_timeout(struct data_pack *data){
 
 // allow to dump data
 void data_rqdump(void){
-	if(last_dump.tv_sec == -1){
-		dump_time.tv_sec = current_t.tv_sec;
-		dump_time.tv_usec = current_t.tv_usec;
-	} else {
-		dump_time.tv_sec = last_dump.tv_sec +
-		                   config[CF_DUMP_INTER].valeur.integer;
-		dump_time.tv_usec = last_dump.tv_usec;
-		if(time_comp(&dump_time, &current_t) == SMALLEST){
-			dump_time.tv_sec = current_t.tv_sec;
-			dump_time.tv_usec = current_t.tv_usec;
-		}
+	dump_time.tv_sec = last_dump.tv_sec +
+	                   config[CF_DUMP_INTER].valeur.integer;
+	dump_time.tv_usec = last_dump.tv_usec;
+	if(dump_time.tv_sec < 0){
+			dump_time.tv_sec = 0;
+			dump_time.tv_usec = 0;
 	}
 }
 
@@ -162,7 +156,6 @@ void data_reset(void){
 			delnext = delnext->next_mac;
 			free(del);
 		}
-
 		step++;
 	}
 
@@ -179,6 +172,26 @@ void data_reset(void){
 	}
 }
 
+// update mac address in hash
+void data_update_field(struct ether_addr *mac, int status,
+                    struct in_addr ip,
+                    U_INT32_T field, struct capt *idcap){
+	struct data_pack *datap;
+	
+	// check if this mac exists
+	datap = data_exist(mac, idcap);
+
+	if(datap == NULL){
+		datap = data_add(mac, status, ip, idcap);
+	} else {
+		datap->alerts = field;
+		datap->flag = status;
+		unindex_ip(ip, idcap);
+		datap->ip.s_addr = ip.s_addr;
+		index_ip(datap);
+	}
+}
+
 // add mac address in hash
 void data_add_field(struct ether_addr *mac, int status,
                     struct in_addr ip,
@@ -189,18 +202,26 @@ void data_add_field(struct ether_addr *mac, int status,
 	datap->alerts = field;
 }
 
+// add mac address in hash whith discover time
+void data_add_time(struct ether_addr *mac, int status,
+                   struct in_addr ip, struct capt *idcap,
+                   struct timeval *tv){
+	struct data_pack *datap;
+
+	datap = data_add(mac, status, ip, idcap);
+	datap->timestamp.tv_sec = tv->tv_sec;
+	datap->timestamp.tv_usec = tv->tv_usec;
+}
+
+
 // add ip in index
 void index_ip(struct data_pack *to_index){
 	struct data_pack *find;
 	int hash;
 
 	// delete hash entry
-	if(to_index->prev_ip != NULL){
-		to_index->prev_ip->next_ip = to_index->next_ip;
-	}
-	if(to_index->next_ip != NULL){
-		to_index->next_ip->prev_ip = to_index->prev_ip;
-	}
+	to_index->prev_ip->next_ip = to_index->next_ip;
+	to_index->next_ip->prev_ip = to_index->prev_ip;
 
 	// calculate ip hash and index data
 	hash = DATA_IP_HASH(to_index->ip.s_addr);
@@ -233,20 +254,19 @@ void unindex_ip(struct in_addr ip, struct capt *idcap){
 	if(next != base){
 		next->prev_ip->next_ip = next->next_ip;
 		next->next_ip->prev_ip = next->prev_ip;
+		next->prev_ip = next;
+		next->next_ip = next;
 	}
 }
 
-// clean old detected mac adresses
+// clean all detected mac adresses
+// emergency procedure
 void data_flush(void){
 	struct data_pack *base;
 	struct data_pack *clean;
 	struct data_pack *next;
-	struct timeval old_t;
 	int step;
 
-	old_t.tv_sec = current_t.tv_sec - config[CF_TOOOLD].valeur.integer;
-	old_t.tv_usec = current_t.tv_usec;
-	
 	// parse hash table
 	step = 0;
 	while(step < HASH_SIZE){
@@ -257,7 +277,7 @@ void data_flush(void){
 
 				// get next
 				next = clean->next_mac;
-				
+
 				// unindex ip hash
 				clean->prev_ip->next_ip = clean->next_ip;
 				clean->next_ip->prev_ip = clean->prev_ip;
@@ -269,10 +289,13 @@ void data_flush(void){
 				// unindex in timeout list
 				clean->prev_chain->next_chain = clean->next_chain;
 				clean->next_chain->prev_chain = clean->prev_chain;
-				
+
+				// remove data
 				free(clean);
-				clean = next;
 				data_size--;
+
+				// next
+				clean = next;
 
 			} else {
 				// get next data
@@ -295,18 +318,17 @@ struct data_pack *data_add(struct ether_addr *mac, int status,
 	#endif
 
 	if(data_size >= config[CF_MAXENTRY].valeur.integer){
-		logmsg(LOG_ERR, "[%s %i] memory up to %i entries: flushing data",
-		       __FILE__, __LINE__, config[CF_MAXENTRY].valeur.integer);
+		logmsg(LOG_ERR, "memory up to %i entries: flushing data",
+		       config[CF_MAXENTRY].valeur.integer);
 		data_flush();
 	}
 	
 	// allocate memory for new data
 	libre = (struct data_pack *)malloc(sizeof(struct data_pack));
 	if(libre == NULL){
-		logmsg(LOG_ERR,
-		       "[%s %i] malloc[%d]: %s",
+		logmsg(LOG_ERR, "[%s %i] malloc[%d]: %s",
 		       __FILE__, __LINE__, 
-				 errno, strerror(errno));
+		       errno, strerror(errno));
 		exit(1);
 	}
 
@@ -326,20 +348,20 @@ struct data_pack *data_add(struct ether_addr *mac, int status,
 	add->next_mac->prev_mac = libre;
 	add->next_mac = libre;
 	
-	// init timeout chain
+	// index time
 	libre->next_chain = libre;
 	libre->prev_chain = libre;
-
-	// index ip
-	index_ip(libre);
-	
-	// index time
 	index_timeout(libre);
 
+	// index ip
+	libre->next_ip = libre;
+	libre->prev_ip = libre;
+	index_ip(libre);
+	
 	#ifdef DEBUG
 	MAC_TO_STR(mac[0], buf);
-	logmsg(LOG_DEBUG, "[%s %i] Address %s add in hash",
-	       __FILE__, __LINE__, buf);
+	logmsg(LOG_DEBUG, "[%s %i %s] Address %s add in hashs",
+	       __FILE__, __LINE__, __FUNCTION__, buf);
 	#endif
 
 	return(libre);
@@ -361,8 +383,8 @@ void data_dump(void){
 	}
 
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %d] running datadump",
-	       __FILE__, __LINE__);
+	logmsg(LOG_DEBUG, "[%s %d %s] running datadump",
+	       __FILE__, __LINE__, __FUNCTION__);
 	#endif		
 
 	// open file
@@ -372,10 +394,10 @@ void data_dump(void){
 
 	// error check
 	if(fp == -1){
-		logmsg(LOG_ERR,
-		       "[%s %i] open[%d]: %s",
+		logmsg(LOG_ERR, "[%s %i] open[%d]: %s (%s)",
 		       __FILE__, __LINE__, 
-		       errno, strerror(errno));
+		       errno, strerror(errno),
+		       config[CF_LEASES].valeur.string);
 		exit(1);
 	}
 
@@ -389,7 +411,7 @@ void data_dump(void){
 			if( ( dump_mask & dump->flag) != 0 ){
 				if(dump->ip.s_addr != 0){
 					len = snprintf(msg, 128,
-					               "%02x:%02x:%02x:%02x:%02x:%02x %s %s\n",
+					               "%02x:%02x:%02x:%02x:%02x:%02x %s %s %u %u\n",
 					               dump->mac.ETHER_ADDR_OCTET[0],
 					               dump->mac.ETHER_ADDR_OCTET[1],
 					               dump->mac.ETHER_ADDR_OCTET[2],
@@ -397,7 +419,9 @@ void data_dump(void){
 					               dump->mac.ETHER_ADDR_OCTET[4],
 					               dump->mac.ETHER_ADDR_OCTET[5], 
 					               inet_ntoa(dump->ip),
-					               dump->cap_id->device);
+					               dump->cap_id->device,
+										(unsigned int)dump->timestamp.tv_sec,
+										(unsigned int)dump->timestamp.tv_usec);
 					write(fp, msg, len);
 				}
 			}
@@ -411,8 +435,7 @@ void data_dump(void){
 
 	// close file
 	if(close(fp) == -1){
-		logmsg(LOG_ERR,
-		       "[%s %i] close[%d]: %s",
+		logmsg(LOG_ERR, "[%s %i] close[%d]: %s",
 		       __FILE__, __LINE__, 
 		       errno, strerror(errno));
 		exit(1);
@@ -431,36 +454,53 @@ void data_clean(void){
 
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG,
-	       "[%s %d] running data clean",
-	       __FILE__, __LINE__);
+	       "[%s %d %s] running data clean",
+	       __FILE__, __LINE__, __FUNCTION__);
 	#endif
 
+	// calculate the time that correspond at current timeout limit
 	old_t.tv_sec = current_t.tv_sec - config[CF_TOOOLD].valeur.integer;
 	old_t.tv_usec = current_t.tv_usec;
 
+	// get first element
 	clean = timeouts->next_chain;
-
-	while(time_comp(&old_t, &(clean->timestamp)) == BIGEST &&
-	      clean != timeouts){
-		// get next
-		clean_next = clean->next_chain;
+	while(clean != timeouts){
 	
-		if(clean->flag == APPEND){
-			// unindex ip hash
-			clean->prev_ip->next_ip = clean->next_ip;
-			clean->next_ip->prev_ip = clean->prev_ip;
+		if(time_comp(&old_t, &(clean->timestamp)) == BIGEST){
 
-			// unindex mac hash
-			clean->prev_mac->next_mac = clean->next_mac;
-			clean->next_mac->prev_mac = clean->prev_mac;
+			// get next
+			clean_next = clean->next_chain;
+	
+			if(clean->flag == APPEND){
+				// unindex ip hash
+				clean->prev_ip->next_ip = clean->next_ip;
+				clean->next_ip->prev_ip = clean->prev_ip;
 
-			// unindex in timeout list
-			clean->prev_chain->next_chain = clean->next_chain;
-			clean->next_chain->prev_chain = clean->prev_chain;
+				// unindex mac hash
+				clean->prev_mac->next_mac = clean->next_mac;
+				clean->next_mac->prev_mac = clean->prev_mac;
+
+				// unindex in timeout list
+				clean->prev_chain->next_chain = clean->next_chain;
+				clean->next_chain->prev_chain = clean->prev_chain;
 				
-			free(clean);
+				// can dump database
+				data_rqdump();
+
+				// delete data
+				free(clean);
+			}
+
+			// set next
+			clean = clean_next;
 		}
-		clean = clean_next;
+
+		// if the firsts times are not biggest
+		// quit beaucause the timeout are ordoned
+		// by time
+		else {
+			return;
+		}
 	}
 }
 
@@ -475,10 +515,9 @@ struct data_pack *data_ip_exist(struct in_addr ip,
 	hash = DATA_IP_HASH(ip.s_addr);
 	base = &data_ip_tab[hash];
 	find = base->next_ip;
-
 	while(find != base){
-		if(find->ip.s_addr == ip.s_addr &&
-		   find->cap_id == idcap){
+		if(find->cap_id == idcap &&
+		   find->ip.s_addr == ip.s_addr){
 			return find;
 		}
 		find = find->next_ip;
@@ -497,7 +536,6 @@ struct data_pack *data_exist(struct ether_addr *mac,
 	hash = DATA_MAC_HASH(mac);
 	base = &data_mac_tab[hash];
 	find = base->next_mac;
-
 	while(find != base){
 		if(find->cap_id == idcap &&
 		   DATA_CMP(&find->mac, mac) == 0){
@@ -510,6 +548,10 @@ struct data_pack *data_exist(struct ether_addr *mac,
 
 // return date of next timeout
 void *data_next(struct timeval *tv){
+	struct timeval next_clean;
+	next_clean.tv_sec = timeouts->next_chain->timestamp.tv_sec +
+	                    config[CF_TOOOLD].valeur.integer;
+	next_clean.tv_usec = timeouts->next_chain->timestamp.tv_usec;
 
 	// if timeout is not set and dump is not set
 	if(timeouts->next_chain == timeouts &&
@@ -521,9 +563,8 @@ void *data_next(struct timeval *tv){
 	// if timeout is set and dump is not set
 	else if(timeouts->next_chain != timeouts &&
 	        dump_time.tv_sec == -1){
-		tv->tv_sec = timeouts->next_chain->timestamp.tv_sec +
-		             config[CF_TOOOLD].valeur.integer;
-		tv->tv_usec = timeouts->next_chain->timestamp.tv_usec;
+		tv->tv_sec = next_clean.tv_sec;
+		tv->tv_usec = next_clean.tv_usec;
 		return data_clean;
 	}
 
@@ -537,10 +578,10 @@ void *data_next(struct timeval *tv){
 
 	// if timeout and dump are sets
 	else if(time_comp(&dump_time,
-	                  &(timeouts->next_chain->timestamp)) == BIGEST){
-		tv->tv_sec = timeouts->next_chain->timestamp.tv_sec +
-		             config[CF_TOOOLD].valeur.integer;
-		tv->tv_usec = timeouts->next_chain->timestamp.tv_usec;
+	                  &next_clean) == BIGEST){
+
+		tv->tv_sec = next_clean.tv_sec;
+		tv->tv_usec = next_clean.tv_usec;
 		return data_clean;
 	} else {
 		tv->tv_sec = dump_time.tv_sec;

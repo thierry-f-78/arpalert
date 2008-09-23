@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.h 313 2006-10-16 12:54:40Z thierry $
+ * $Id: alerte.h 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
@@ -8,7 +8,8 @@
 #define __ALERTE_H__
 
 // send new alert
-void alerte(char *, char *, char *, int);
+void alerte_script(char *mac, char *ip, int no, char *ref,
+                   char *interface, char *vendor);
 
 // init memory structurs
 void alerte_init(void);

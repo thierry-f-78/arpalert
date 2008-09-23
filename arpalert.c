@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: arpalert.c 313 2006-10-16 12:54:40Z thierry $
+ * $Id: arpalert.c 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
@@ -31,6 +31,7 @@
 #include "sens_timeouts.h"
 #include "loadmodule.h"
 #include "func_time.h"
+#include "macname.h"
 
 extern int errno;
 
@@ -50,6 +51,9 @@ int main(int argc, char **argv){
 	struct timeval temp_timeout;
 	struct timeval cur_timeout;
 	struct timeval *tmout;
+	
+	// set flags as not forked
+	is_forked = FALSE;
 	
 	// init current_time
 	//current_time = time(NULL);
@@ -80,9 +84,16 @@ int main(int argc, char **argv){
 	(void)setsignal(SIGABRT, die);
 	(void)setsignal(SIGHUP,  loadconfig); 
 
-	// mac sturcturs initialization
+	// mac structurs initialization
 	data_init();
-	sens_init();
+
+	// initialize acl checks
+	if(sens_init(SENS_LOAD) == -1){
+		logmsg(LOG_ERR,
+		       "errors in file \"%s\": not reload",
+		       config[CF_AUTHFILE].valeur.string);
+		exit(1);
+	}
 
 	// sens_timeouts initializations
 	sens_timeout_init();
@@ -90,8 +101,14 @@ int main(int argc, char **argv){
 	// alert
 	alerte_init();
 
+	// load vendor database
+	macname_init();
+	if(macname_load(MACNAME_LOAD) == -1){
+		exit(1);
+	}
+
 	// load maclist
-	maclist_reload();
+	maclist_load();
 
 	// init abuse counter
 	cap_abus();
@@ -110,7 +127,7 @@ int main(int argc, char **argv){
 
 		// check timeout for sens_timeout functions
 		if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
-			check_temp = sens_timeout_next(&temp_timeout);
+		   check_temp = sens_timeout_next(&temp_timeout);
 			if(temp_timeout.tv_sec != -1){
 				if(cur_timeout.tv_sec != -1){
 					if(time_comp(&cur_timeout, &temp_timeout) == BIGEST){
@@ -124,13 +141,6 @@ int main(int argc, char **argv){
 					check_timeout = check_temp;
 				}
 			}
-
-/*
-printf("unauth: %d.%d cur: %d.%d\n",
-temp_timeout.tv_sec, temp_timeout.tv_usec,
-cur_timeout.tv_sec, cur_timeout.tv_usec);
-*/
-
 		}
 		
 
@@ -150,12 +160,6 @@ cur_timeout.tv_sec, cur_timeout.tv_usec);
 			}
 		}
 
-/*
-printf("proces: %d.%d cur: %d.%d\n",
-temp_timeout.tv_sec, temp_timeout.tv_usec,
-cur_timeout.tv_sec, cur_timeout.tv_usec);
-*/
-
 		// check capture management
 		check_temp = cap_next(&temp_timeout);
 		if(temp_timeout.tv_sec != -1){
@@ -171,12 +175,6 @@ cur_timeout.tv_sec, cur_timeout.tv_usec);
 				check_timeout = check_temp;
 			}
 		}
-
-/*
-printf("captur: %d.%d cur: %d.%d\n",
-temp_timeout.tv_sec, temp_timeout.tv_usec,
-cur_timeout.tv_sec, cur_timeout.tv_usec);
-*/
 
 		// check data management
 		check_temp = data_next(&temp_timeout);
@@ -194,15 +192,9 @@ cur_timeout.tv_sec, cur_timeout.tv_usec);
 			}
 		}
 
-/*
-printf("data  : %d.%d cur: %d.%d\n",
-temp_timeout.tv_sec, temp_timeout.tv_usec,
-cur_timeout.tv_sec, cur_timeout.tv_usec);
-*/
-
 		// calculate timeout time from the next timeout date
 		if(cur_timeout.tv_sec != -1){
-			time_sous(&cur_timeout, &current_t, &timeout);
+		   time_sous(&cur_timeout, &current_t, &timeout);
 
 			// prevent negative timeout
 			if(timeout.tv_sec < 0){
@@ -213,35 +205,31 @@ cur_timeout.tv_sec, cur_timeout.tv_usec);
 			timeout.tv_usec += 10000;
 			tmout = &timeout;
 
-/*
-printf("next time out = %d.%d\n",timeout.tv_sec, timeout.tv_usec);
-printf("%d.%d - %d.%d => %d.%d\n",
-cur_timeout.tv_sec, cur_timeout.tv_usec,
-current_t.tv_sec, current_t.tv_usec,
-timeout.tv_sec, timeout.tv_usec);
-*/
-
 		} else {
 			tmout = NULL;
 		}
 
 		// block waiting for next system event or timeout
-		selret = select(max_filed + 1, &read_filed_set, NULL, NULL, tmout);
+		selret = select(max_filed + 1, &read_filed_set,
+		                NULL, NULL, tmout);
 
 		// maj current hour
 		gettimeofday(&current_t, NULL);
 	
 		// errors:
+		#if (__NetBSD__)
+		if (selret == -1 && errno != EINTR && errno != EINVAL){
+		#else
 		if (selret == -1 && errno != EINTR){
-			logmsg(LOG_ERR, "[%s %i] select: %s",
-			       __FILE__, __LINE__, strerror(errno));
+		#endif
+			logmsg(LOG_ERR, "[%s %i] select[%d]: %s",
+			       __FILE__, __LINE__, errno, strerror(errno));
 			exit(1);
 		}
 		
 		// timeouts
 		if(selret == 0){
 			if(check_timeout != NULL){
-// printf("%08x at %d.%d\n", check_timeout, current_t.tv_sec, current_t.tv_usec);
 				check_timeout();
 			}
 		}
@@ -257,9 +245,12 @@ timeout.tv_sec, timeout.tv_usec);
 
 void die(int signal){
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] End with signal: %i",
-	       __FILE__, __LINE__, signal);
+	logmsg(LOG_DEBUG, "[%s %i %s] arpalert ended with signal: %i",
+	       __FILE__, __LINE__, __FUNCTION__, signal);
 	#endif
+
+	// dump database
+	data_dump();
 
 	// close module
 	module_unload();
@@ -270,5 +261,6 @@ void die(int signal){
 void loadconfig(int signal){
 	maclist_reload();
 	sens_reload();
+	macname_reload();
 }
 

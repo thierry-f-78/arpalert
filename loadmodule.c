@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadmodule.c 313 2006-10-16 12:54:40Z  $
+ * $Id: loadmodule.c 399 2006-10-29 08:09:10Z  $
  *
  */
 
@@ -39,7 +39,7 @@ void module_load(void){
 		return;
 	}
 
-	// teste si c'est un fichier
+	// test if is a regular file
 	if(stat(config[CF_MOD_ALERT].valeur.string, &entinfo) == -1){
 		logmsg(LOG_ERR, "[%s %d] stat[%d]: %s (%s)",
 		       __FILE__, __LINE__, errno, strerror(errno),
@@ -47,17 +47,15 @@ void module_load(void){
 		abort();
 	}
 	if(!S_ISREG(entinfo.st_mode)){
-		logmsg(LOG_ERR, "[%s %d]: \"%s\" not a regular file",
-		       __FILE__, __LINE__,
+		logmsg(LOG_ERR, "the module file \"%s\" is a regular file",
 		       config[CF_MOD_ALERT].valeur.string);
 	}
 
 	// load module and resolve symbols
 	module = dlopen(config[CF_MOD_ALERT].valeur.string, RTLD_NOW);
 	if(!module) {
-		logmsg(LOG_ERR, "[%s %d] dlopen: file \"%s\": %s",
+		logmsg(LOG_ERR, "[%s %d] dlopen: %s",
 		       __FILE__, __LINE__, 
-		       config[CF_MOD_ALERT].valeur.string,
 		       dlerror());
 		exit(1);
 	}
@@ -96,13 +94,23 @@ void module_load(void){
 void module_unload(void){
 	const char *tmp;
 
-	if(module == NULL) return;
-	if(mod_unload != NULL) mod_unload();
+	// check avalaibility of modules
+	if(config[CF_MOD_ALERT].valeur.string == NULL ||
+	   config[CF_MOD_ALERT].valeur.string[0] == 0){
+		return;
+	}
 
+	// unload module
+	if(mod_unload != NULL){
+		mod_unload();
+	}
+
+	// close module
 	dlclose(module);
 	tmp = dlerror();
 	if(tmp != NULL) {
-		logmsg(LOG_ERR, "[%s %D] %s", __FILE__, __LINE__, tmp);
+		logmsg(LOG_ERR, "[%s %d] dlclose: %s",
+		       __FILE__, __LINE__, tmp);
 	}
 }
 
@@ -113,7 +121,8 @@ void alerte_mod(struct ether_addr *mac_sender,
                 int type,
                 struct ether_addr *ref_mac,
                 struct in_addr ref_ip,
-					 char *interface){
+					 char *interface,
+                char *vendor){
 	void *args[4];
 	int parm_num = 3;
 
@@ -138,6 +147,10 @@ void alerte_mod(struct ether_addr *mac_sender,
 			args[3] = ref_mac;
 			parm_num = 4;
 			break;
+	}
+	if(config[CF_MOD_VENDOR].valeur.integer){
+		args[parm_num] = vendor;
+		parm_num++;
 	}
 	
 	mod_alert(type, parm_num, args);

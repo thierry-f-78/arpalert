@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: func_str.c 313 2006-10-16 12:54:40Z  $
+ * $Id: func_str.c 399 2006-10-29 08:09:10Z  $
  *
  */
 
@@ -13,8 +13,8 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
-#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-#include <net/if_dl.h>
+#if (__NetBSD__ || __FreeBSD__ || __OpenBSD__)
+#   include <net/if_dl.h>
 #endif
 
 
@@ -39,6 +39,24 @@ const u_char hex_conv[103] = {
 	13, 14, 15                              /* 102 */
 };
 
+// convert hex string to int
+int strhex_to_int(char *hex){
+	int ret = 0;
+	
+	while(*hex != 0){
+		if((*hex < 'a' || *hex > 'f' ) &&
+		   (*hex < 'A' || *hex > 'F' ) &&
+		   (*hex < '0' || *hex > '9')){
+			return -1;
+		}
+		ret *= 16;
+		ret += hex_conv[(int)*hex];
+		hex++;
+	}
+
+	return ret;
+}
+
 // translate string mac to binary mac
 int str_to_mac(char *macaddr, struct ether_addr *to_mac){
 	int i;
@@ -47,18 +65,24 @@ int str_to_mac(char *macaddr, struct ether_addr *to_mac){
 	i = 0;
 	while(i <= 19) {
 		switch(i){
-			case  0: case  1: case  3: case  4: case  6:
-			case  7: case  9: case 10: case 12: case 13:
+			case  0: case  1:
+			case  3: case  4:
+			case  6: case  7:
+			case  9: case 10:
+			case 12: case 13:
 			case 15: case 16:
-				if(macaddr[i] < 'a' && macaddr[i] > 'f' &&
-				   macaddr[i] < 'A' && macaddr[i] > 'F' &&
-				   macaddr[i] < '0' && macaddr[i] > '9'){
+				if((macaddr[i] < 'a' || macaddr[i] > 'f' ) &&
+				   (macaddr[i] < 'A' || macaddr[i] > 'F' ) &&
+				   (macaddr[i] < '0' || macaddr[i] > '9')){
 					return -1;
 				}
 				break;
 
-			case  2: case  5: case  8:
-			case 11: case 14:
+			case  2:
+			case  5:
+			case  8:
+			case 11:
+			case 14:
 				if(macaddr[i] != ':'){
 					return -1;
 				}

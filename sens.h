@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.h 313 2006-10-16 12:54:40Z thierry $
+ * $Id: sens.h 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
@@ -9,8 +9,16 @@
 
 #include "data.h"
 
-// init data
-void sens_init(void);
+/* load data aor acls
+ * @param status:
+ *        SENS_TEST: test file
+ *        SENS_LOAD: load file
+ * @return:   0 if is ok
+ *           -1 if is not ok
+ */
+#define SENS_TEST   0
+#define SENS_LOAD   1
+int sens_init(int status);
 
 // free data memory
 void sens_free(void);

@@ -6,7 +6,7 @@
 #AC_SUBST(VERSION)
 
 # Process this file with autoconf to produce a configure script.
-AC_INIT(arpalert, 2.0.0)
+AC_INIT(arpalert, 2.0.1)
 AC_PREREQ(2.59)
 
 # get OS type
@@ -39,7 +39,6 @@ AC_CHECK_HEADERS(arpa/inet.h, , echo "didn't find arpa/inet.h"; exit 1)
 AC_CHECK_HEADERS(dlfcn.h, , echo "didn't find dlfcn.h"; exit 1)
 AC_CHECK_HEADERS(errno.h, , echo "didn't find errno.h"; exit 1)
 AC_CHECK_HEADERS(fcntl.h, , echo "didn't find fcntl.h"; exit 1)
-AC_CHECK_HEADERS(getopt.h, , echo "didn't find getopt.h"; exit 1)
 AC_CHECK_HEADERS(grp.h, , echo "didn't find grp.h"; exit 1)
 if test "x${OS}" = "xFreeBSD" || \
    test "x${OS}" = "xOpenBSD" || \
@@ -60,14 +59,14 @@ AC_CHECK_HEADERS(sys/param.h, , echo "didn't find sys/param.h"; exit 1)
 AC_CHECK_HEADERS(sys/select.h, , echo "didn't find sys/select.h"; exit 1)
 AC_CHECK_HEADERS(sys/socket.h, , echo "didn't find sys/socket.h"; exit 1)
 AC_CHECK_HEADERS(sys/stat.h, , echo "didn't find sys/stat.h"; exit 1)
-if test "x${OS}" = "xSunOS" ||
-   test "x${OS}" = "xLinux"; then
+if test "x${OS}" = "xLinux"; then
 	AC_CHECK_HEADERS(net/if_arp.h, , echo "didn't find net/if_arp.h"; exit 1)
-	AC_CHECK_HEADERS(net/if.h, , echo "didn't find net/if.h"; exit 1)
 	AC_CHECK_HEADERS(netinet/if_ether.h, , echo "didn't find netinet/if_ether.h"; exit 1)
 fi
-if test "x${OS}" = "xSunOS" ||
-   test "x${OS}" = "xFreeBsd" ||
+if test "x${OS}" = "xLinux"; then
+	AC_CHECK_HEADERS(net/if.h, , echo "didn't find net/if.h"; exit 1)
+fi
+if test "x${OS}" = "xFreeBsd" ||
    test "x${OS}" = "xLinux"; then
 	AC_CHECK_HEADERS(sys/sysctl.h, , echo "didn't find sys/sysctl.h"; exit 1)
 fi
@@ -109,6 +108,7 @@ AC_FUNC_FORK
 AC_FUNC_MALLOC
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_STAT
+AC_FUNC_MEMCMP
 
 ##############################################################
 # compilation options
@@ -136,6 +136,7 @@ echo "======================================================="
 echo " = Generate files"
 echo "======================================================="
 AC_CONFIG_FILES(Makefile)
+AC_CONFIG_FILES(install.sh)
 AC_CONFIG_FILES(scripts/start/arpalert-debian)
 AC_CONFIG_FILES(scripts/start/arpalert-fc4)
 AC_CONFIG_FILES(scripts/start/arpalert-suse)

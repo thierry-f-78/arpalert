@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 313 2006-10-16 12:54:40Z thierry $
+ * $Id: loadconfig.c 399 2006-10-29 08:09:10Z thierry $
  *
  */
 
 #include "config.h"
 
 #include <stdio.h>
-#include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include "arpalert.h"
 #include "loadconfig.h"
 #include "log.h"
 
-#define OPTIONS "f:i:p:Pe:dwD:l:vV"
+extern int errno;
 
 char msg[4096];
 int dump = 0;
@@ -31,8 +31,9 @@ int convert_boolean(char*);
 void usage(){
 	printf(
 	"\n"
-	"arpalert [-f config_file] [-i network_interface] [-p pid_file] [-e exec_script]\n"
-	"    [-D log_level] [-l leases_file] [-d][-v][-h][-w][-v][-P]\n"
+	"arpalert [-f config_file] [-i network_interface]\n"
+	"    [-p pid_file] [-e exec_script] [-D log_level]\n"
+	"    [-l leases_file] [-d][-v][-h][-w][-v][-P]\n"
 	"\n"
 	"    -d run as daemon\n"
 	"    -v dump config\n"
@@ -125,7 +126,7 @@ void config_load(int argc, char *argv[]){
 	
 	config[CF_MAXENTRY].type = 1;
 	config[CF_MAXENTRY].attrib = "max entry";
-	config[CF_MAXENTRY].valeur.integer = 1048576;	/* 14Mo */
+	config[CF_MAXENTRY].valeur.integer = 1048576;
 	
 	config[CF_DMPWL].type = 2;
 	config[CF_DMPWL].attrib = "dump white list";
@@ -141,7 +142,7 @@ void config_load(int argc, char *argv[]){
 	
 	config[CF_TOOOLD].type = 1;
 	config[CF_TOOOLD].attrib = "mac timeout";
-	config[CF_TOOOLD].valeur.integer = 2592000; /* 1 month */
+	config[CF_TOOOLD].valeur.integer = 2592000; // 1 month
 
 	config[CF_IGNORE_ME].type = 2;
 	config[CF_IGNORE_ME].attrib = "ignore me";
@@ -182,6 +183,20 @@ void config_load(int argc, char *argv[]){
 	config[CF_PROMISC].type = 2;
 	config[CF_PROMISC].attrib = "promiscuous";
 	config[CF_PROMISC].valeur.integer = FALSE;
+
+	// convert mac to vendor name
+	config[CF_MACCONV_FILE].type = 0;
+	config[CF_MACCONV_FILE].attrib = "mac vendor file";
+	config[CF_MACCONV_FILE].valeur.string = NULL;
+	config[CF_LOG_VENDOR].type = 2;
+	config[CF_LOG_VENDOR].attrib = "log mac vendor";
+	config[CF_LOG_VENDOR].valeur.integer = FALSE;
+	config[CF_ALERT_VENDOR].type = 2;
+	config[CF_ALERT_VENDOR].attrib = "alert mac vendor";
+	config[CF_ALERT_VENDOR].valeur.integer = FALSE;
+	config[CF_MOD_VENDOR].type = 2;
+	config[CF_MOD_VENDOR].attrib = "mod mac vendor";
+	config[CF_MOD_VENDOR].valeur.integer = FALSE;
 
 	config[CF_ANTIFLOOD_INTER].type = 1;
 	config[CF_ANTIFLOOD_INTER].attrib = "anti flood interval";
@@ -299,7 +314,7 @@ void config_load(int argc, char *argv[]){
 		}
 		if(argv[i][0]=='-' && argv[i][1]=='f'){
 			if(i+1 >= argc){
-				fprintf(stderr, "Option -f without argument\n");
+				logmsg(LOG_ERR, "Option -f without argument");
 				usage();
 			}
 			i++;
@@ -311,7 +326,7 @@ void config_load(int argc, char *argv[]){
 	buf = buffer;
 	fp = fopen(config_file, "r");
 	if(fp == NULL){
-		fprintf(stderr, "didn't find %s, loading default config\n",
+		logmsg(LOG_ERR, "didn't find %s, loading default config",
 		        config_file);
 	} else {
 		while((buf = fgets(buf, 4096, fp)) != NULL){
@@ -320,7 +335,11 @@ void config_load(int argc, char *argv[]){
 				miseenmemoire(buf);
 			}
 		}
-		fclose(fp);
+		if(fclose(fp) == EOF){
+			logmsg(LOG_ERR, "[%s %d] fclose[%d]: %s",
+			       __FILE__, __LINE__, errno, strerror(errno));
+			exit(1);
+		}
 	}
 
 	/* load command line parameters 
@@ -334,7 +353,7 @@ void config_load(int argc, char *argv[]){
 
 				case 'i':
 					if(i+1 >= argc){
-						fprintf(stderr, "Option -i without argument\n");
+						logmsg(LOG_ERR, "Option -i without argument");
 						usage();
 					}
 					i++;
@@ -346,7 +365,7 @@ void config_load(int argc, char *argv[]){
 	
 				case 'p':
 					if(i+1 >= argc){
-						fprintf(stderr, "Option -p without argument\n");
+						logmsg(LOG_ERR, "Option -p without argument");
 						usage();
 					}
 					i++;
@@ -358,7 +377,7 @@ void config_load(int argc, char *argv[]){
 	
 				case 'e':
 					if(i+1 >= argc){
-						fprintf(stderr, "Option -e without argument\n");
+						logmsg(LOG_ERR, "Option -e without argument");
 						usage();
 					}
 					i++;
@@ -370,12 +389,12 @@ void config_load(int argc, char *argv[]){
 				
 				case 'D':
 					if(i+1 >= argc){
-						fprintf(stderr, "Option -D without argument\n");
+						logmsg(LOG_ERR, "Option -D without argument");
 						usage();
 					}
 					i++;
 					if(argv[i][0] < 48 || argv[i][0] > 55){
-						fprintf(stderr, "Wrong -D parameter\n");
+						logmsg(LOG_ERR, "Wrong -D parameter");
 						usage();
 					}
 					config[CF_LOGLEVEL].valeur.integer = argv[i][0] - 48;
@@ -383,7 +402,7 @@ void config_load(int argc, char *argv[]){
 	
 				case 'l':
 					if(i+1 >= argc){
-						fprintf(stderr, "Option -l without argument\n");
+						logmsg(LOG_ERR, "Option -l without argument");
 						usage();
 					}
 					i++;
@@ -417,7 +436,7 @@ void config_load(int argc, char *argv[]){
 				case 'h':
 				case '?':
 				default:
-					fprintf(stderr, "Wrong option: -%c\n", argv[i][1]);
+					logmsg(LOG_ERR, "Wrong option: -%c", argv[i][1]);
 					usage();
 					exit(1);
 					break;
@@ -429,18 +448,20 @@ void config_load(int argc, char *argv[]){
 		for(i=0; i<NUM_PARAMS; i++){
 			switch(config[i].type){
 				case 0:
-					printf("%s = \"%s\"\n", config[i].attrib, config[i].valeur.string);
+					logmsg(LOG_NOTICE, "%s = \"%s\"",*
+					       config[i].attrib, config[i].valeur.string);
 				break;
 
 				case 1:
-					printf("%s = %i\n", config[i].attrib, config[i].valeur.integer);
+					logmsg(LOG_NOTICE, "%s = %i",
+					       config[i].attrib, config[i].valeur.integer);
 				break;
 
 				case 2:
 					if(config[i].valeur.integer == TRUE){
-						printf("%s = true\n", config[i].attrib);
+						logmsg(LOG_NOTICE, "%s = true", config[i].attrib);
 					} else {
-						printf("%s = false\n", config[i].attrib);
+						logmsg(LOG_NOTICE, "%s = false", config[i].attrib);
 					}
 				break;
 			}
@@ -478,20 +499,20 @@ void miseenmemoire(char *buf){
 		src++;
 	}
 	if(m_eq==NULL){
-		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
+		logmsg(LOG_ERR, "error in config file at line: \"%s\"", buf);
 		exit(1);
 	}
 	m_end=src;
 	if(*m_eq!='='){
-		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
+		logmsg(LOG_ERR, "error in config file at line: \"%s\"", buf);
 		exit(1);
 	}
 	if(*(m_eq-1)!=' '){
-		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
+		logmsg(LOG_ERR, "error in config file at line: \"%s\"", buf);
 		exit(1);
 	}
 	if(*(m_eq+1)!=' '){
-		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
+		logmsg(LOG_ERR, "error in config file at line: \"%s\"", buf);
 		exit(1);
 	}
 	src=buf;
@@ -518,10 +539,17 @@ void miseenmemoire(char *buf){
 	while(i < NUM_PARAMS){
 		if(strcmp(config[i].attrib, g)==0){
 			switch(config[i].type){
-				case 0: config[i].valeur.string = strdup(d); break;
-				case 1: config[i].valeur.integer = convert_int(d); break;
-				case 2: config[i].valeur.integer = convert_boolean(d); break;
-				case 3: config[i].valeur.integer = convert_octal(d); break;
+				case 0: config[i].valeur.string = strdup(d);
+				        break;
+
+				case 1: config[i].valeur.integer = convert_int(d);
+				        break;
+
+				case 2: config[i].valeur.integer = convert_boolean(d);
+				        break;
+
+				case 3: config[i].valeur.integer = convert_octal(d);
+				        break;
 			}
 			ok = 1;
 			break;
@@ -529,8 +557,8 @@ void miseenmemoire(char *buf){
 		i++;
 	}
 	if(ok == 0){
-		fprintf(stderr, "error in config file at "
-		        "line: \"%s\": parameter inexistent\n",
+		logmsg(LOG_ERR, "error in config file at "
+		        "line: \"%s\": parameter inexistent",
 		        buf);
 		exit(1);
 	}
@@ -545,8 +573,8 @@ int convert_octal(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'7'){
-			fprintf(stderr, "error in config file in "
-			        "string \"%s\": octal value expected\n",
+			logmsg(LOG_ERR, "error in config file in "
+			        "string \"%s\": octal value expected",
 			        b);
 			exit(1);
 		}
@@ -565,8 +593,8 @@ int convert_int(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'9'){
-			fprintf(stderr, "error in config file in "
-			        "string \"%s\": integer value expected\n",
+			logmsg(LOG_ERR, "error in config file in "
+			        "string \"%s\": integer value expected",
 			        b);
 			exit(1);
 		}
@@ -590,7 +618,7 @@ int convert_boolean(char *buf){
 	if(strcmp("false", buf) == 0) return(FALSE);
 	if(strcmp("0",     buf) == 0) return(FALSE);
 
-	fprintf(stderr, "error in config file: boolean value expected [%s]\n",
+	logmsg(LOG_ERR, "error in config file: boolean value expected [%s]",
 		buf);
 	exit(1);	 
 }
