@@ -149,8 +149,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		broadcast.bytes[1] = 255;
 		broadcast.bytes[2] = 255;
 		broadcast.bytes[3] = 255;
-		if(sens_exist(ip_32, broadcast)==FALSE){ 
-			if(sens_exist(ip_32, ip_33)==FALSE){
+		if(sens_exist(&macs, broadcast)==FALSE){ 
+			if(sens_exist(&macs, ip_33)==FALSE){
 				if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
 					logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", \
 					       seq, smacs, ip, iq);

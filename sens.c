@@ -17,7 +17,7 @@
 
 /* structures */
 struct pqt {
-	data_ip ip_s;
+	data_mac mac;
 	data_ip ip_d;
 	struct pqt *next;
 };
@@ -25,7 +25,7 @@ struct pqt {
 /* hash */ 
 struct pqt *pqt_h[HASH_SIZE];
 
-unsigned int sens_hash(data_ip, data_ip);
+unsigned int sens_hash(data_mac *, data_ip);
 
 /* data_init */
 void sens_init(void) {
@@ -33,8 +33,8 @@ void sens_init(void) {
 	char *buf;
 	FILE *fp;
 	int i, dec, line;
-	unsigned char ip[16];
-	data_ip ip_s;
+	unsigned char ip[32];
+	data_mac mac;
 	data_ip ip_d;
 	
 	memset(&pqt_h, 0, HASH_SIZE * sizeof(struct pqt *));
@@ -83,9 +83,9 @@ void sens_init(void) {
 		dec=0;
 		memset(ip, 0, 16);
 		while(1){
-			if((buf[i]>='0' && buf[i]<='9')||buf[i]=='.'){
+			if((buf[i]>='0' && buf[i]<='9')||(buf[i]>='a' && buf[i]<='f')||buf[i]=='.'||buf[i]==':'){
 				ip[dec]=buf[i];
-				if(dec>15){
+				if(dec>17){
 					logmsg(LOG_ERR, 
 						"[%s %i] invalid ip address [%s] at line [%s:%d]", 
 						__FILE__, __LINE__, 
@@ -94,24 +94,24 @@ void sens_init(void) {
 				}
 				dec++;
 			}
-			if(buf[i]==':'){
-				ip_s.ip=data_toip(ip);
-				#ifdef DEBUG
-				logmsg(LOG_DEBUG, "[%s %i] ip address [%s] source",
+			if(buf[i]=='-'){
+				data_tohex(ip, &mac);
+				#ifdef DEBUG_SENS
+				logmsg(LOG_DEBUG, "[%s %i] mac address [%s] source",
 					__FILE__, __LINE__, ip);
 				#endif
 				dec=0;
-				memset(ip, 0, 16);
+				memset(ip, 0, 32);
 			}
 			if(buf[i]==',' || buf[i]==0){
 				ip_d.ip=data_toip(ip);
-				sens_add(ip_s, ip_d);
-				#ifdef DEBUG
+				sens_add(&mac, ip_d);
+				#ifdef DEBUG_SENS
 				logmsg(LOG_DEBUG, "[%s %i] ip address [%s] dest",
 					__FILE__, __LINE__, ip);
 				#endif
 				dec=0;
-				memset(ip, 0, 16);
+				memset(ip, 0, 32);
 			}
 			if(buf[i]==0||i>=8192)break;
 			i++;
@@ -121,17 +121,22 @@ void sens_init(void) {
 }
 
 /* data_add */
-void sens_add(data_ip ipa, data_ip ipb){
+void sens_add(data_mac *mac, data_ip ipb){
 	int h;
 	struct pqt *spqt;
 	struct pqt *mpqt;
 
 	mpqt = (struct pqt *)malloc(sizeof(struct pqt));
-	mpqt->ip_s=ipa;
+	mpqt->mac.octet[0]=mac->octet[0];
+	mpqt->mac.octet[1]=mac->octet[1];
+	mpqt->mac.octet[2]=mac->octet[2];
+	mpqt->mac.octet[3]=mac->octet[3];
+	mpqt->mac.octet[4]=mac->octet[4];
+	mpqt->mac.octet[5]=mac->octet[5];
 	mpqt->ip_d=ipb;
 	mpqt->next=NULL;
 
-	h = sens_hash(ipa, ipb);
+	h = sens_hash(mac, ipb);
 	spqt = (struct pqt *)pqt_h[h];
 	
 	/* find a free space */
@@ -158,25 +163,31 @@ void sens_free(void){
 	}
 }
 
-int sens_exist(data_ip ipa, data_ip ipb){
+int sens_exist(data_mac *mac, data_ip ipb){
 		int h;
 		struct pqt *spqt;
 
-		h = sens_hash(ipa, ipb);
+		h = sens_hash(mac, ipb);
 		spqt = (struct pqt *)pqt_h[h];
 		if(spqt==NULL)return(FALSE);
 		while(spqt != NULL){
-			if(spqt->ip_s.ip==ipa.ip && spqt->ip_d.ip==ipb.ip)return(TRUE);
+			if(spqt->ip_d.ip==ipb.ip && \
+				spqt->mac.octet[0]==mac->octet[0] && \
+				spqt->mac.octet[1]==mac->octet[1] && \
+				spqt->mac.octet[2]==mac->octet[2] && \
+				spqt->mac.octet[3]==mac->octet[3] && \
+				spqt->mac.octet[4]==mac->octet[4] && \
+				spqt->mac.octet[5]==mac->octet[5] )return(TRUE);
 			spqt=spqt->next;
 		}
 		return(FALSE);
 }
 
 /* fait le hachage */
-unsigned int sens_hash(data_ip ipa, data_ip ipb){
+unsigned int sens_hash(data_mac *mac, data_ip ipb){
 	unsigned int v;
 
-	v = (ipa.ip + ipb.ip) % HASH_SIZE;
+	v = (mac->octet[4] + mac->octet[5] + ipb.ip) % HASH_SIZE;
 	return(v);
 }
 
