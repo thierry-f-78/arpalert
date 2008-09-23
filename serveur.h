@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.h 399 2006-10-29 08:09:10Z thierry $
+ * $Id: serveur.h 423 2006-11-04 11:50:24Z  $
  *
  */
 
@@ -12,9 +12,6 @@ void daemonize(void);
 
 // set security option (user separation, etc ...)
 void separe(void);
-
-// assign function to signal interuption
-void (*setsignal (int, void (*)(int)))(int);
 
 #endif
 

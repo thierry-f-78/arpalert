@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens_timeouts.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: sens_timeouts.c 357 2006-10-25 12:38:32Z  $
  *
  */
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 405 2006-10-29 08:27:22Z thierry $
+ * $Id: data.c 420 2006-11-04 10:56:02Z  $
  *
  */
 
@@ -177,6 +177,9 @@ void data_update_field(struct ether_addr *mac, int status,
                     struct in_addr ip,
                     U_INT32_T field, struct capt *idcap){
 	struct data_pack *datap;
+	#ifdef DEBUG 
+	char buf[18];
+	#endif
 	
 	// check if this mac exists
 	datap = data_exist(mac, idcap);
@@ -189,6 +192,11 @@ void data_update_field(struct ether_addr *mac, int status,
 		unindex_ip(ip, idcap);
 		datap->ip.s_addr = ip.s_addr;
 		index_ip(datap);
+		#ifdef DEBUG
+		MAC_TO_STR(*mac, buf);
+		logmsg(LOG_DEBUG, "[%s %d %s] address %s updated",
+		       __FILE__, __LINE__, __FUNCTION__, buf);
+		#endif
 	}
 }
 
@@ -360,7 +368,7 @@ struct data_pack *data_add(struct ether_addr *mac, int status,
 	
 	#ifdef DEBUG
 	MAC_TO_STR(mac[0], buf);
-	logmsg(LOG_DEBUG, "[%s %i %s] Address %s add in hashs",
+	logmsg(LOG_DEBUG, "[%s %d %s] address %s add in hashs",
 	       __FILE__, __LINE__, __FUNCTION__, buf);
 	#endif
 

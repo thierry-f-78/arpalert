@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: macname.c 399 2006-10-29 08:09:10Z  $
+ * $Id: macname.c 416 2006-11-03 19:02:30Z  $
  *
  */
 
@@ -87,6 +87,9 @@ int macname_load(int mode){
 	// check option avalaibility
 	if(config[CF_MACCONV_FILE].valeur.string == NULL ||
 	   config[CF_MACCONV_FILE].valeur.string[0] == 0){
+		config[CF_LOG_VENDOR].valeur.integer = FALSE;
+		config[CF_ALERT_VENDOR].valeur.integer = FALSE;
+		config[CF_MOD_VENDOR].valeur.integer = FALSE;
 		return 0;
 	}
 

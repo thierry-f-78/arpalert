@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: loadconfig.c 428 2006-11-04 12:15:58Z  $
  *
  */
 
@@ -33,14 +33,23 @@ void usage(){
 	"\n"
 	"arpalert [-f config_file] [-i network_interface]\n"
 	"    [-p pid_file] [-e exec_script] [-D log_level]\n"
-	"    [-l leases_file] [-d][-v][-h][-w][-v][-P]\n"
+	"    [-l leases_file] [-d] [-f] [-v] [-h] [-w]\n"
+	"    [-P][-V]\n"
 	"\n"
-	"    -d run as daemon\n"
-	"    -v dump config\n"
-	"    -h this help\n"
-	"    -w debug option: print a dump of paquets captured\n"
-	"    -P run in promiscuous mode\n"
-	"    -V version\n"
+	"    -f conf_file: configuration file\n"
+	"    -i devices:   comma separated list of interfaces\n"
+	"    -p pid_file:  file with pid of daemon\n"
+	"    -e script:    script executed whith alerts\n"
+	"    -D loglevel:  loglevel (0 to 7)\n"
+	"    -l leases:    file to store mac addresses\n"
+	"    -d:           run as daemon\n"
+	"    -F:           run in foreground\n"
+	"    -v:           dump config\n"
+	"    -h:           this help\n"
+	"    -w:           debug option: print a dump of paquets captured\n"
+	"                  (loglevel 7)\n"
+	"    -P:           run in promiscuous mode\n"
+	"    -V:           version\n"
 	"\n");
 	exit(1);
 }
@@ -427,6 +436,10 @@ void config_load(int argc, char *argv[]){
 				
 				case 'd':
 					config[CF_DAEMON].valeur.integer = TRUE;
+					break;
+	
+				case 'F':
+					config[CF_DAEMON].valeur.integer = FALSE;
 					break;
 	
 				case 'P':

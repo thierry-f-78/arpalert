@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: alerte.c 412 2006-11-03 18:33:17Z  $
  *
  */
 
@@ -48,8 +48,6 @@ struct t_pid unused_pid;
 // used base
 struct t_pid used_pid;
 
-void alerte_kill_pid(int);
-		  
 // pid list initialization 
 void alerte_init(void){
 	int counter;
@@ -83,9 +81,6 @@ void alerte_init(void){
 		counter++;
 	}
 	assign->next = NULL;
-
-	// check children end
-	(void)setsignal(SIGCHLD, alerte_kill_pid);
 }
 
 // add a pid to list 
@@ -150,7 +145,7 @@ void delpid(int pid){
 	unused_pid.next = assign;
 }
 
-void alerte_kill_pid(int signal){
+void alerte_kill_pid(void){
 	int pid;
 
 	#ifdef DEBUG
@@ -181,9 +176,6 @@ void alerte_kill_pid(int signal){
 		#endif
 		delpid(pid);
 	}
-
-	// set signal
-	(void)setsignal(SIGCHLD, alerte_kill_pid);
 }
 
 // check validity of pids
@@ -232,7 +224,8 @@ void alerte_check(void){
 		} 
 
 		// if the process is stopped
-		else if(return_code == -1){
+		// else if(return_code == -1){
+		else {
 			#ifdef DEBUG
 			logmsg(LOG_DEBUG, "[%s %i %s] pid %i is ended, removing "
 			       "from check list",

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.h 399 2006-10-29 08:09:10Z thierry $
+ * $Id: alerte.h 412 2006-11-03 18:33:17Z  $
  *
  */
 
@@ -20,6 +20,6 @@ void *alerte_next(struct timeval *tv);
 // check validity of all current alert scripts
 void alerte_check(void);
 
-//void alerte_kill_pid(int signal);
+void alerte_kill_pid(void);
 
 #endif

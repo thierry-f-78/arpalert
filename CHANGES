@@ -1,3 +1,8 @@
+2.0.2   * info<at>arpalert<dot>org
+BETA      serialization of sigchld signal and sigkill, sighup
+          option for force run in foreground
+          maj man
+
 2.0.1   * info<at>arpalert<dot>org
 BETA      retrieve mac vendor name
           load leases files and remember the mac already discovered
@@ -97,6 +102,8 @@ BETA      permit to listen more than one interface
           Add suse start script
           Add FC4 start script
           Add 2 management scripts
+
+0.4.15-2: bugfix: bug zombies
 
 0.4.15-1: bugfix: new mac detection error
 

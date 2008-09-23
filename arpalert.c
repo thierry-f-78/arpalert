@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: arpalert.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: arpalert.c 429 2006-11-04 12:20:50Z  $
  *
  */
 
@@ -28,6 +28,7 @@
 #include "serveur.h"
 #include "alerte.h"
 #include "sens.h"
+#include "signals.h"
 #include "sens_timeouts.h"
 #include "loadmodule.h"
 #include "func_time.h"
@@ -36,7 +37,6 @@
 extern int errno;
 
 void die(int);
-void loadconfig(int);
 void dumpmaclist(int);
 
 int dumptime = 0;
@@ -44,13 +44,14 @@ int nettoyage = 0;
 
 int main(int argc, char **argv){
 	fd_set read_filed_set;
-	int selret, max_filed;
+	int selret, max_filed, index;
 	void (* check_timeout)(void);
 	void (* check_temp)(void);
 	struct timeval timeout;
 	struct timeval temp_timeout;
 	struct timeval cur_timeout;
 	struct timeval *tmout;
+	void *(* get_next_interupt[6])(struct timeval *tv);
 	
 	// set flags as not forked
 	is_forked = FALSE;
@@ -78,11 +79,7 @@ int main(int argc, char **argv){
 	separe();
 	
 	// set up signals
-	(void)setsignal(SIGINT,  die);
-	(void)setsignal(SIGTERM, die);
-	(void)setsignal(SIGQUIT, die);
-	(void)setsignal(SIGABRT, die);
-	(void)setsignal(SIGHUP,  loadconfig); 
+	signals_init();
 
 	// mac structurs initialization
 	data_init();
@@ -113,6 +110,34 @@ int main(int argc, char **argv){
 	// init abuse counter
 	cap_abus();
 
+	// init sheduler system
+	index = 0;
+
+	// check timeout for program lauched
+	get_next_interupt[index] = alerte_next;
+	index++;
+
+	// check capture management
+	get_next_interupt[index] = cap_next;
+	index++;
+
+	// check data management
+	get_next_interupt[index] = data_next;
+	index++;
+
+	// signals
+	get_next_interupt[index] = signals_next;
+	index++;
+
+	// check timeout for sens_timeout functions
+	if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
+		get_next_interupt[index] = alerte_next;
+		index++;
+	}
+
+	// end
+	get_next_interupt[index] = NULL;
+
 	// scheduler
 	while(TRUE){
 
@@ -124,10 +149,14 @@ int main(int argc, char **argv){
 		cur_timeout.tv_sec = -1;
 		check_temp = NULL;
 		check_timeout = NULL;
+		index = 0;
 
-		// check timeout for sens_timeout functions
-		if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
-		   check_temp = sens_timeout_next(&temp_timeout);
+		while(get_next_interupt[index] != NULL){
+			
+			// run next interupt
+		   check_temp = get_next_interupt[index](&temp_timeout);
+
+			// if timeout is returned
 			if(temp_timeout.tv_sec != -1){
 				if(cur_timeout.tv_sec != -1){
 					if(time_comp(&cur_timeout, &temp_timeout) == BIGEST){
@@ -141,55 +170,9 @@ int main(int argc, char **argv){
 					check_timeout = check_temp;
 				}
 			}
-		}
-		
 
-		// check timeout for program lauched
-		check_temp = alerte_next(&temp_timeout);
-		if(temp_timeout.tv_sec != -1){
-			if(cur_timeout.tv_sec != -1){
-				if(time_comp(&cur_timeout, &temp_timeout) == BIGEST){
-					cur_timeout.tv_sec = temp_timeout.tv_sec;
-					cur_timeout.tv_usec = temp_timeout.tv_usec;
-					check_timeout = check_temp;
-				}
-			} else {
-				cur_timeout.tv_sec = temp_timeout.tv_sec;
-				cur_timeout.tv_usec = temp_timeout.tv_usec;
-				check_timeout = check_temp;
-			}
-		}
-
-		// check capture management
-		check_temp = cap_next(&temp_timeout);
-		if(temp_timeout.tv_sec != -1){
-			if(cur_timeout.tv_sec != -1){
-				if(time_comp(&cur_timeout, &temp_timeout) == BIGEST){
-					cur_timeout.tv_sec = temp_timeout.tv_sec;
-					cur_timeout.tv_usec = temp_timeout.tv_usec;
-					check_timeout = check_temp;
-				}
-			} else {
-				cur_timeout.tv_sec = temp_timeout.tv_sec;
-				cur_timeout.tv_usec = temp_timeout.tv_usec;
-				check_timeout = check_temp;
-			}
-		}
-
-		// check data management
-		check_temp = data_next(&temp_timeout);
-		if(temp_timeout.tv_sec != -1){
-			if(cur_timeout.tv_sec != -1){
-				if(time_comp(&cur_timeout, &temp_timeout) == BIGEST){
-					cur_timeout.tv_sec = temp_timeout.tv_sec;
-					cur_timeout.tv_usec = temp_timeout.tv_usec;
-					check_timeout = check_temp;
-				}
-			} else {
-				cur_timeout.tv_sec = temp_timeout.tv_sec;
-				cur_timeout.tv_usec = temp_timeout.tv_usec;
-				check_timeout = check_temp;
-			}
+			// get next interrupt
+			index++;
 		}
 
 		// calculate timeout time from the next timeout date
@@ -226,7 +209,7 @@ int main(int argc, char **argv){
 			       __FILE__, __LINE__, errno, strerror(errno));
 			exit(1);
 		}
-		
+
 		// timeouts
 		if(selret == 0){
 			if(check_timeout != NULL){
@@ -241,26 +224,5 @@ int main(int argc, char **argv){
 	}
 
 	exit(1);
-}
-
-void die(int signal){
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i %s] arpalert ended with signal: %i",
-	       __FILE__, __LINE__, __FUNCTION__, signal);
-	#endif
-
-	// dump database
-	data_dump();
-
-	// close module
-	module_unload();
-	
-	exit(0);
-}
-
-void loadconfig(int signal){
-	maclist_reload();
-	sens_reload();
-	macname_reload();
 }
 

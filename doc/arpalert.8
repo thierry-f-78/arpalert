@@ -1,6 +1,6 @@
 .\"
 .\" Copyright (c) 2005-2010 Thierry FOURNIER
-.\" $Id: arpalert.8 399 2006-10-29 08:09:10Z thierry $
+.\" $Id: arpalert.8 428 2006-11-04 12:15:58Z  $
 .\"
 .TH ARPALERT 8 2006-05-09 "" "arp traffic monitoring"
 .SH NAME
@@ -10,38 +10,44 @@ Arpalert uses ARP protocol monitoring to prevent unauthorized connections on the
 If an illegal connection is detected, a program or script is launched, which could be used to send an alert message, for example.
 .SH COMMAND LINE
 .TP
-\fB\-d\fR
-Run as daemon
-.TP
-\fB\-D log_level\fR
-The level logged. the level are bitween 0 (emergency) and 7 (debug). if 3 is selected all levels bitween 0 and 3 arre logged.
-.TP
-\fB\-e exec_script\fR
-Script launched when an alert is send
-.TP
-\fB\-h\fR
-The help command line.
+\fB\-f config_file\fR
+Use this config file
 .TP
 \fB\-i interface\fR 
 Comma separated network interfaces to lesson
 .TP
-\fB\-f config_file\fR
-Use this config file
+\fB\-p pid_file\fR
+Use this pid file. this file contain a pid number of the arpalert session. if the file exist and his locked, the deamon do not run.
+.TP
+\fB\-e exec_script\fR
+Script launched when an alert is send
+.TP
+\fB\-D log_level\fR
+The level logged. the level are bitween 0 (emergency) and 7 (debug). if 3 is selected all levels bitween 0 and 3 arre logged.
 .TP
 \fB\-l leases_file\fR
 This file contain a dump of the mac address in memory (see config file).
 .TP
-\fB\-p pid_file\fR
-Use this pid file. this file contain a pid number of the arpalert session. if the file exist and his locked, the deamon do not run.
+\fB\-d\fR
+Run as daemon
 .TP
-\fB\-P\fR
-Set the interface in promiscuous mode (don't set this if only the arp analyse is used)
+\fB\-F\fR
+Run in foreground
 .TP
 \fB\-v\fR
 Watch on screen all the option selected (the options specified in config file and the default options)
 .TP
+\fB\-h\fR
+The help command line.
+.TP
 \fB\-w\fR
 Debug option: print a dump of paquets captured.
+.TP
+\fB\-P\fR
+Set the interface in promiscuous mode (don't set this if only the arp analyse is used)
+.TP
+\fB\-V\fR
+Print version and quit
 .\"
 .\" CONFIG FILE
 .\"

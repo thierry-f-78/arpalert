@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: capture.c 420 2006-11-04 10:56:02Z  $
  *
  */
 
@@ -259,7 +259,7 @@ pcap_t *cap_init_device(struct capt *cap_id){
 	}
 
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i %s] pcap_setfilter [%s]: ok",
+	logmsg(LOG_DEBUG, "[%s %d %s] pcap_setfilter [%s]: ok",
 	       __FILE__, __LINE__, __FUNCTION__, filtre);
 	#endif
 
@@ -563,7 +563,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 	}
 	
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] capture packet", __FILE__, __LINE__);
+	logmsg(LOG_DEBUG, "[%s %d %s] capture packet",
+	       __FILE__, __LINE__, __FUNCTION__);
 	#endif
 
 	//increment sequence
@@ -1138,8 +1139,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 void cap_abus(void){
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG,
-	       "[%s %d] running abus reset",
-	       __FILE__, __LINE__);
+	       "[%s %d %s] running abus reset",
+	       __FILE__, __LINE__, __FUNCTION__);
 	#endif
 
 	abus = config[CF_ABUS].valeur.integer + 1;

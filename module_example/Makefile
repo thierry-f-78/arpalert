@@ -1,5 +1,5 @@
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile 399 2006-10-29 08:09:10Z  $
+# $Id: Makefile 210 2006-10-05 12:25:42Z  $
 
 CC = gcc
 CFLAGS = -Wall -g

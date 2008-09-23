@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.h 399 2006-10-29 08:09:10Z thierry $
+ * $Id: loadconfig.h 360 2006-10-25 13:25:28Z  $
  *
  */
 

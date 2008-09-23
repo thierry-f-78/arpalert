@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: maclist.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: maclist.c 420 2006-11-04 10:56:02Z  $
  *
  */
 
@@ -277,7 +277,8 @@ void maclist_reload(void){
 	int retval;
 
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Reload maclist", __FILE__, __LINE__);
+	logmsg(LOG_DEBUG, "[%s %d %s] reload maclist",
+	       __FILE__, __LINE__, __FUNCTION__);
 	#endif
 
 	// test white list

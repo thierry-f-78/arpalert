@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.c 399 2006-10-29 08:09:10Z thierry $
+ * $Id: serveur.c 423 2006-11-04 11:50:24Z  $
  *
  */
 
@@ -176,20 +176,4 @@ void separe(void){
 	// create file rights
 	umask(config[CF_UMASK].valeur.integer);
 }
-
-void (*setsignal (int signal, void (*function)(int)))(int) {    
-	struct sigaction old, new;
-
-	memset(&new, 0, sizeof(struct sigaction));
-	new.sa_handler = function;
-	new.sa_flags = SA_RESTART;
-	sigemptyset(&(new.sa_mask));
-	if (sigaction(signal, &new, &old)){ 
-		logmsg(LOG_ERR, "[%s %i] sigaction[%d]: %s",
-		       __FILE__, __LINE__, errno, strerror(errno));
-		exit(1);
-	}
-	return(old.sa_handler);
-}
-
 
