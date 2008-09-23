@@ -1,3 +1,14 @@
+2.0.6   * info<at>arpalert<dot>org
+          default config file syntax correction and comments
+          display list of mac vendor loaded only in debug compil mode
+
+        * brmichel<at>free<dot>fr
+          add vim syntax file
+
+        * Joost van Baal
+          would not require manually editing the script to fix
+          the sender and receiver's email adress.
+
 2.0.5   * info<at>arpalert<dot>org
           bugfix in arp selftest detection
           bugfix in scheduler

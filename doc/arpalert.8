@@ -1,6 +1,6 @@
 .\"
 .\" Copyright (c) 2005-2010 Thierry FOURNIER
-.\" $Id: arpalert.8 485 2007-03-12 18:09:43Z thierry $
+.\" $Id: arpalert.8 508 2007-06-07 09:12:02Z thierry $
 .\"
 .TH ARPALERT 8 2006-05-09 "" "arp traffic monitoring"
 .SH NAME
@@ -106,8 +106,8 @@ List of authorized request
 \fBlock file\fR = /var/run/arpalert.lock
 pid file
 .TP
-\fBdump paquet\fR = false
-Only for debugging: this dump packet received on standard output
+\fBdump packet\fR = false
+Only for debugging: this dump packet received on standard output. The syntax "\fBdump paquet\fR" is also avalaible, but is deprecated
 .TP
 \fBdaemon\fR = false
 If is set to true, run the program as daemon

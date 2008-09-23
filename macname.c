@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: macname.c 485 2007-03-12 18:09:43Z  $
+ * $Id: macname.c 508 2007-06-07 09:12:02Z  $
  *
  */
 
@@ -184,10 +184,12 @@ int macname_load(int mode){
 		// insert data
 		if(mode == MACNAME_LOAD){
 			// load
+			#ifdef DEBUG
 			logmsg(LOG_DEBUG, 
 			       "load %s:%s:%s => %s",
 			       args[0], args[1], args[2],
 			       args[3]);
+			#endif
 
 			// allocate memory for new data
 			libre = (struct macname *)malloc(sizeof(struct macname));

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.h 485 2007-03-12 18:09:43Z thierry $
+ * $Id: loadconfig.h 508 2007-06-07 09:12:02Z thierry $
  *
  */
 
@@ -33,6 +33,7 @@ enum {
 	CF_AUTHFILE,
 	CF_IGNORE_UNKNOWN,
 	CF_DUMP_PAQUET,
+	CF_DUMP_PACKET,
 	CF_PROMISC,
 	CF_ANTIFLOOD_INTER,
 	CF_ANTIFLOOD_GLOBAL,

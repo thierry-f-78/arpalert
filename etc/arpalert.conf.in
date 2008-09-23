@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: arpalert.conf.in 485 2007-03-12 18:09:43Z thierry $
+# $Id: arpalert.conf.in 508 2007-06-07 09:12:02Z thierry $
 # 
 # Default config file
 # 
@@ -36,7 +36,7 @@ user = arpalert
 umask = 177
 
 # only for debugging: this dump paquet received on standard outpu
-dump paquet = false
+dump packet = false
 
 # run the program as daemon ?
 daemon = false
@@ -99,6 +99,7 @@ anti flood interval = 5
 anti flood global = 50
 
 # vendor name
+# add the mac vendor field in logs, alerts script and/or module execution
 mac vendor file = "@config_dir@/oui.txt"
 log mac vendor = true
 alert mac vendor = true
@@ -155,7 +156,7 @@ log request abus = true
 alert on request abus = true
 mod on request abus = true
 # maximun request authorized by second
-Max request = 1000000
+max request = 1000000
 
 # log if the ethernet mac address are different than the arp amc address (only for requestor)
 log mac error = true

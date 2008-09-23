@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 485 2007-03-12 18:09:43Z thierry $
+ * $Id: capture.c 508 2007-06-07 09:12:02Z thierry $
  *
  */
 
@@ -647,7 +647,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		// get ip of arp rcpt
 		memcpy(&arp_ip_rcpt.s_addr, arp_data_base, arp_header->ar_pln);
 
-		if(config[CF_DUMP_PAQUET].valeur.integer == TRUE){
+		if(config[CF_DUMP_PAQUET].valeur.integer == TRUE ||
+		   config[CF_DUMP_PACKET].valeur.integer == TRUE){
 
 			// convert eth mac sender to string
 			MAC_TO_STR(eth_mac_sender[0], str_eth_mac_sender);

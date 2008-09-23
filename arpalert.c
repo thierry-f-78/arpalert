@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: arpalert.c 485 2007-03-12 18:09:43Z thierry $
+ * $Id: arpalert.c 508 2007-06-07 09:12:02Z thierry $
  *
  */
 
@@ -188,6 +188,7 @@ int main(int argc, char **argv){
 			timeout.tv_usec += 10000;
 			tmout = &timeout;
 
+		// if no timeout
 		} else {
 			tmout = NULL;
 		}

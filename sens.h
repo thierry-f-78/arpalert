@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.h 485 2007-03-12 18:09:43Z thierry $
+ * $Id: sens.h 508 2007-06-07 09:12:02Z thierry $
  *
  */
 

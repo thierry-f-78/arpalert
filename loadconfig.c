@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 485 2007-03-12 18:09:43Z thierry $
+ * $Id: loadconfig.c 508 2007-06-07 09:12:02Z thierry $
  *
  */
 
@@ -188,6 +188,9 @@ void config_load(int argc, char *argv[]){
 	config[CF_DUMP_PAQUET].type = 2;
 	config[CF_DUMP_PAQUET].attrib = "dump paquet";
 	config[CF_DUMP_PAQUET].valeur.integer = FALSE;
+	config[CF_DUMP_PACKET].type = 2;
+	config[CF_DUMP_PACKET].attrib = "dump packet";
+	config[CF_DUMP_PACKET].valeur.integer = FALSE;
 
 	config[CF_PROMISC].type = 2;
 	config[CF_PROMISC].attrib = "promiscuous";

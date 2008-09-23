@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: tool_code.sh 485 2007-03-12 18:09:43Z  $
+# $Id: tool_code.sh 508 2007-06-07 09:12:02Z  $
 #
 
 case $1 in

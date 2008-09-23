@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.c 485 2007-03-12 18:09:43Z thierry $
+ * $Id: alerte.c 508 2007-06-07 09:12:02Z thierry $
  *
  */
 
