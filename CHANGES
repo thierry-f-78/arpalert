@@ -1,3 +1,9 @@
+2.0.11  * Jan Wagner waja<at>cyconet<dot>org
+          Don't erase configure when make mrproper is called
+          Update error in man
+        * info<at>arpalert<dot>org
+          minor orthographic correction in doc
+
 2.0.10  * info<at>arpalert<dot>org
           bug into leases file reading
           new script in contribs by mikuskuikku

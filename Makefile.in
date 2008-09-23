@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile.in 684 2008-03-28 18:01:29Z thierry $
+# $Id: Makefile.in 690 2008-03-31 18:36:43Z  $
 # 
 
 prefix = @prefix@
@@ -111,10 +111,10 @@ build_module_example:
 	@cd module_example; make; cd ..
 
 mrproper: clean
-	-@rm -rf arpalert-sources.pdf autom4te.cache configure Makefile \
-	       scripts/start/arpalert-debian scripts/start/arpalert-fc4 \
-	       scripts/start/arpalert-suse config.h install.sh \
-	       configure.scan autoscan.log
+	-@rm -rf arpalert-sources.pdf autom4te.cache Makefile \
+	         scripts/start/arpalert-debian scripts/start/arpalert-fc4 \
+	         scripts/start/arpalert-suse config.h install.sh \
+	         configure.scan autoscan.log
 
 clean:
 	-@rm -f *~ *.o config.log config.status arpalert

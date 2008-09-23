@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: maclist.c 684 2008-03-28 18:01:29Z thierry $
+ * $Id: maclist.c 696 2008-03-31 18:44:59Z  $
  *
  */
 
@@ -222,7 +222,7 @@ int maclist_file(char *file_name, int level, int mode){
 				return -1;
 			}
 
-			// get discovering date of paquet date
+			// get discovering date of packet date
 			discover.tv_sec = atoi(args[3]);
 			discover.tv_usec = atoi(args[4]);
 

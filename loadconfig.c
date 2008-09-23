@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 684 2008-03-28 18:01:29Z thierry $
+ * $Id: loadconfig.c 696 2008-03-31 18:44:59Z  $
  *
  */
 
@@ -48,7 +48,7 @@ void usage(){
 	"    -F:           run in foreground\n"
 	"    -v:           dump config\n"
 	"    -h:           this help\n"
-	"    -w:           debug option: print a dump of paquets captured\n"
+	"    -w:           debug option: print a dump of packets captured\n"
 	"                  (loglevel 7)\n"
 	"    -P:           run in promiscuous mode\n"
 	"    -V:           version\n"
