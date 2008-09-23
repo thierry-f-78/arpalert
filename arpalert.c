@@ -1,7 +1,6 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -20,37 +19,35 @@
 
 void die(int);
 void loadconfig(int);
-void setsignal(int, void *);
 void dumpmaclist(int);
 void killchild(int);
+/*void setsignal(int, void *);*/
+void (*setsignal (int, void (*)(int)))(int);
 
-int dumptime;
-int nettoyage;
+int dumptime = 0;
+int nettoyage = 0;
 
 int main(int argc, char **argv){
 	/* Copie des parametre e la lignes de commande pour analyse lors d'un rechargement de la config */
 	margc = argc;
 	margv = argv;
-	dumptime = 0;
-	nettoyage = 0;
 	flagdump = TRUE;
 	
 	/* va lire le fichier de configuration */
-	config_init();
 	config_load();
-	
+
 	/* si il le faut, passer le binaire en daemon */
 	if(config[CF_DAEMON].valeur.integer == TRUE) daemonize();
 
 	/* mise en place des signaux */
-	setsignal(SIGINT, (void *)&die);
-	setsignal(SIGTERM, (void *)&die);
-	setsignal(SIGQUIT, (void *)&die);
-	setsignal(SIGABRT, (void *)&die);
-	setsignal(SIGHUP, (void *)&loadconfig); 
-	setsignal(SIGALRM, (void *)&dumpmaclist);
+	(void)setsignal(SIGINT,  die);
+	(void)setsignal(SIGTERM, die);
+	(void)setsignal(SIGQUIT, die);
+	(void)setsignal(SIGABRT, die);
+	(void)setsignal(SIGHUP,  loadconfig); 
+	(void)setsignal(SIGALRM, dumpmaclist);
 	if(config[CF_ACTION].valeur.string[0]!=0){
-		setsignal(SIGCHLD, (void *)&killchild);
+		(void)setsignal(SIGCHLD, killchild);
 	}
 
 	/* initialisation de la structure mac */
@@ -60,32 +57,29 @@ int main(int argc, char **argv){
 	if(config[CF_ACTION].valeur.string[0]!=0){
 		alerte_init();
 	}
-	
+
 	/* chargement de la maclist */
 	maclist_reload();
-	
+
 	/* init du compteur d'abus */
 	cap_abus();
-	
-	/* initilidation du sniffeur */
-	cap_init();
-	
+
 	/* declenchement des alarmes (dump database) */
 	alarm(CHECKPOINT);
-	
+
 	/* boucle principale */
 	cap_snif();
 
 	/* nettoyage des zones memoires */
 	data_close();
-	
+
 	/* valeur de retour */
-	return(0);
+	exit(0);
 }
 
 void die(int signal){
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] End with signal: %i\n", __FILE__, __LINE__, signal);
+	logmsg(LOG_DEBUG, "[%s %i] End with signal: %i", __FILE__, __LINE__, signal);
 	#endif
 	data_close();
 	exit(0);
@@ -93,6 +87,7 @@ void die(int signal){
 
 void killchild(int signal){
 	alerte_kill_pid();
+	(void)setsignal(SIGCHLD, killchild);
 }
 
 void loadconfig(int signal){
@@ -104,7 +99,7 @@ void dumpmaclist(int signal){
 	if((time(NULL) - dumptime) > 5){
 		if(flagdump == TRUE){
 			#ifdef DEBUG 
-			logmsg(LOG_DEBUG, "[%s %i] Signal %i: dump database\n", __FILE__, __LINE__, signal);
+			logmsg(LOG_DEBUG, "[%s %i] Signal %i: dump database", __FILE__, __LINE__, signal);
 			#endif
 			data_dump();
 			flagdump = FALSE;
@@ -123,14 +118,17 @@ void dumpmaclist(int signal){
 	alarm(CHECKPOINT);
 }
 
-void setsignal(int signal, void *function){
-	struct sigaction *new;
+void (*setsignal (int signal, void (*function)(int)))(int) {	
+	struct sigaction old, new;
 
-	new = (struct sigaction *)malloc(sizeof(struct sigaction));
-	(*new).sa_handler = (__sighandler_t)function;
-	
-	if (sigaction(signal, new, NULL)){
-		logmsg(LOG_ERR, "[%s %i] Error when setting signal %i\n", __FILE__, __LINE__, signal);
+	memset(&new, 0, sizeof(struct sigaction));
+	new.sa_handler = function;
+	new.sa_flags = SA_RESTART;
+	sigemptyset(&(new.sa_mask));
+	if (sigaction(signal, &new, &old)){
+		logmsg(LOG_ERR, "[%s %i] Error when setting signal %i", __FILE__, __LINE__, signal);
 		exit(1);
 	}
+	return(old.sa_handler);
 }
+

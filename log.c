@@ -20,7 +20,9 @@ void logmsg(int priority, const char *fmt, ...){
 
 	va_start(ap, fmt);
 	vsnprintf(msg, 4096, fmt, ap);
-
+	va_end(ap);
+	msg[4095] = 0;
+	
 	#ifdef USE_SYSLOG
 	syslog(priority, msg); 
 	#else
@@ -28,5 +30,4 @@ void logmsg(int priority, const char *fmt, ...){
 	fputs(msg, fp);
 	fclose(fp);
 	#endif
-	va_end(ap);
 }

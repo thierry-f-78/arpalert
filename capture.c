@@ -1,4 +1,5 @@
 #include <pcap.h>
+#include <pcap-bpf.h>
 #include <stdlib.h>
 #include <net/if.h>
 #include <net/ethernet.h>
@@ -16,17 +17,18 @@
 #define SNAP_LEN 1514
 #define FILTER "arp or rarp"
 
-pcap_t *idcap;
-bpf_u_int32 netp, maskp;
-struct bpf_program bp;
-int seq = 1;
+int seq = 0;
 int abus = 50;
+int base = 22;
 
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 
-void cap_init(void){
+void cap_snif(void){
 	char err[PCAP_ERRBUF_SIZE];
 	char *device;
+	pcap_t *idcap;
+	bpf_u_int32 netp, maskp;
+	struct bpf_program bp;
 	
 	/* recherche le premier device deisponoible */
 	device = NULL;
@@ -59,6 +61,21 @@ void cap_init(void){
 		exit(1);
 	}
 
+	logmsg(LOG_DEBUG, "[%s %i] pcap link type:  %s", __FILE__, __LINE__, pcap_datalink_val_to_name(pcap_datalink(idcap)));
+	switch(pcap_datalink(idcap)){
+		case DLT_EN10MB:
+			base = 22;
+			break;
+
+		case DLT_LINUX_SLL:
+			base = 24;
+			break;
+
+		default:
+			base = 22;
+			break;
+	}
+	
 	/* initilise le filtre: */
 	if(pcap_compile(idcap, &bp, FILTER, 0x100, maskp) < 0){
 		logmsg(LOG_ERR, "[%s %i] pcap_compile error: %s", __FILE__, __LINE__, pcap_geterr(idcap));
@@ -73,10 +90,7 @@ void cap_init(void){
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] pcap_setfilter [%s]: ok", __FILE__, __LINE__, FILTER);
 	#endif
-}
 
-
-void cap_snif(void){
 	if(pcap_loop(idcap, 0, callback, NULL) <0){
 		logmsg(LOG_ERR, "[%s %i] pcap_loop error: %s", __FILE__, __LINE__, pcap_geterr(idcap));
 		exit(1);
@@ -87,28 +101,27 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	data_mac macs;
 	unsigned char smacs[18];
 	unsigned char ip[16];
-	struct ether_header *eh;
-	struct ether_arp *ea;
 	data_pack *data;
 	data_ip ip_32;
-	int i, ret;
+	int ret;
 
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] Capture packet", __FILE__, __LINE__);
 	#endif
 
-	eh = (struct ether_header *)buff;
-	ea = (struct ether_arp *)(eh + 1);
-	i=-1;
-	while(i++<5) macs.octet[i] = ea->arp_sha[i];
-	
+	macs.octet[0] = buff[base + 0];
+	macs.octet[1] = buff[base + 1];
+	macs.octet[2] = buff[base + 2];
+	macs.octet[3] = buff[base + 3];
+	macs.octet[4] = buff[base + 4];
+	macs.octet[5] = buff[base + 5];
+	ip_32.bytes[0] = buff[base + 6];
+	ip_32.bytes[1] = buff[base + 7];
+	ip_32.bytes[2] = buff[base + 8];
+	ip_32.bytes[3] = buff[base + 9];
+		
 	data_tomac(macs, smacs);
-	ip_32.bytes[0] = ea->arp_spa[0];
-	ip_32.bytes[1] = ea->arp_spa[1];
-	ip_32.bytes[2] = ea->arp_spa[2];
-	ip_32.bytes[3] = ea->arp_spa[3];
-	
-	snprintf((char *)ip, 16, "%u.%u.%u.%u", ea->arp_spa[0], ea->arp_spa[1], ea->arp_spa[2], ea->arp_spa[3]);
+	snprintf((char *)ip, 16, "%u.%u.%u.%u", ip_32.bytes[0], ip_32.bytes[1], ip_32.bytes[2], ip_32.bytes[3]);
 
 	data = data_exist(&macs);
 
@@ -116,14 +129,13 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	
 	abus--;
 	if(abus==0){
-		/*snprintf(msg, 1024, "SEQ:%i, ILLEGAL: MAC:%s, IP:%s (non reference)\n", seq, smacs, ip);*/
-		logmsg(LOG_NOTICE, "[%s %i] Abnormal network ARP requests", __FILE__, __LINE__);
+		logmsg(LOG_NOTICE, "Abnormal network ARP requests");
 	}
 	
 	/* si pas d'adresse identifiée */
 	if(data == NULL){
 		if(config[CF_LOGNEW].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "ILLEGAL: MAC:%s, IP:%s (unreferenced)", smacs, ip);
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new", seq, smacs, ip);
 		}
 
 		if(config[CF_ALRNEW].valeur.integer == TRUE){
@@ -143,23 +155,24 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	/* test ip */
 	if(data[0].ip.ip != ip_32.ip){
 		if(config[CF_LOGIP].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "ILLEGAL: MAC:%s, IP:%s REFERENCE:%i.%i.%i.%i (ip change)", smacs, ip, (*data).ip.bytes[0], (*data).ip.bytes[1], (*data).ip.bytes[2], (*data).ip.bytes[3]);
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s reference=%u.%u.%u.%u type=ip_change)",
+				seq, smacs, ip, ip_32.bytes[0], ip_32.bytes[1], ip_32.bytes[2], ip_32.bytes[3]);
 		}
 		
 		if(config[CF_ALRIP].valeur.integer == TRUE){
 			ret = alerte(smacs, ip, 0); 
 			#ifdef DEBUG
 			if(ret > 0){
-				logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", ret);
+				logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
 			}
 			#endif
 		}
 	}
 	
-	/* si entrée ajoutée mai non reference */
+	/* si entrée ajoutée mais non reference */
 	if(data[0].flag == APPEND){
 		if(config[CF_LOGALLOW].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "ILLEGAL: MAC:%s, IP:%s (unreferenced but already detected)", smacs, ip);
+			logmsg(LOG_NOTICE, "seq=%d mac=%s, ip=%s, type=unknow_address", seq, smacs, ip);
 		}
 
 		if(config[CF_ALRALLOW].valeur.integer == TRUE){
@@ -176,7 +189,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	/* si entree interdite */
 	if(data[0].flag == DENY){
 		if(config[CF_LOGDENY].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "ILLEGAL: MAC:%s, IP:%s (referencced in black list)", smacs, ip);
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=black_listed", seq, smacs, ip);
 		}
 
 		if(config[CF_ALRDENY].valeur.integer == TRUE){

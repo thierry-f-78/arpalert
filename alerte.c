@@ -22,11 +22,6 @@ typedef struct {
 c_pid *pids;
 int num_pids;
 
-/*	flag pour suignaler l'effacement (declencche en thread) et bloquer l'ajout
-	0: ok, 1: effacement 
-*/
-int check_pid;
-
 /* initilisation de pids */
 void alerte_init(void){
 	pids = (c_pid *)malloc(sizeof(c_pid));
@@ -35,7 +30,6 @@ void alerte_init(void){
 		logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct", __FILE__, __LINE__);
 		exit(-1);
         }
-	check_pid=0;
 }
 
 /* ajout d'un pid a la liste */
@@ -58,7 +52,8 @@ void addpid(int pid){
 	pids[num_pids-1].pid = pid;
 	pids[num_pids-1].time = time(NULL);
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Add pid %i at position  %i at time %i", __FILE__, __LINE__, pids[num_pids-1].pid, num_pids-1, (unsigned int)pids[num_pids-1].time);
+	logmsg(LOG_DEBUG, "[%s %i] Add pid %i at position  %i at time %i", __FILE__, __LINE__,
+		pids[num_pids-1].pid, num_pids-1, (unsigned int)pids[num_pids-1].time);
 	#endif
 }
 
@@ -98,18 +93,6 @@ void alerte_kill_pid(void){
 	int i;
 	int status;
 
-	/* si le flag est en place, on quitte la fonction */
-	if(check_pid==1){
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] check_pid locked", __FILE__, __LINE__);
-		#endif
-		return;
-	}
-
-        /* positionne le flag check */
-	logmsg(LOG_DEBUG, "[%s %i] locking check_pid", __FILE__, __LINE__);
-        check_pid=1;
-
 	i=0;
 	while(i < num_pids){
 		#ifdef DEBUG
@@ -122,12 +105,6 @@ void alerte_kill_pid(void){
 		logmsg(LOG_DEBUG, "[%s %i] Stop waitpid", __FILE__, __LINE__);
 		#endif
 	}
-
-	/* supprime le flag */
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] unlocking check_pid", __FILE__, __LINE__);
-	#endif
-	check_pid=0;
 }
 
 /* verification des pids */
@@ -136,14 +113,6 @@ void alerte_check(void){
 	int status;
 	int ret;
 
-	/* si le flag est en place, on quitte la fonction */
-	if(check_pid==1){
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] check_pid locked", __FILE__, __LINE__);
-		#endif
-		return;
-	}
-
 	if(num_pids==0){
 		#ifdef DEBUG
 		logmsg(LOG_DEBUG, "[%s %i] no pid in pid list", __FILE__, __LINE__);
@@ -151,18 +120,13 @@ void alerte_check(void){
 		return;
 	}
 
-	/* positionne le flag check */
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] loking check_pid", __FILE__, __LINE__);
-	#endif
-	check_pid=1;
-	
 	i = 0;
 	while(i < num_pids){
 		/* va voir si le processus fonctionne */
 		ret = waitpid(pids[i].pid, &status, WNOHANG);
 		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] analyse de pid[%i]: %i, temps: %i, code retour = %i", __FILE__, __LINE__, i, pids[i].pid, (unsigned int)pids[i].time, ret);
+		logmsg(LOG_DEBUG, "[%s %i] analyse de pid[%i]: %i, temps: %i, code retour = %i", __FILE__, __LINE__,
+			i, pids[i].pid, (unsigned int)pids[i].time, ret);
 		#endif
 
 		/* si il fonctionne mais que son temps est depasse */
@@ -194,13 +158,6 @@ void alerte_check(void){
 		}
 		i++;
 	}
-
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Unlock check_pid. Checkup PID end", __FILE__, __LINE__);
-	#endif
-	
-	/* eneleve le flag check */
-	check_pid=0;
 }
 
 /* genere une alerte */
@@ -212,25 +169,12 @@ int alerte(unsigned char *mac, unsigned char *ip, int alert_level){
 	/* si le script n'est pas defini on quitte */
 	if(config[CF_ACTION].valeur.string[0]==0) return(0);
 	
-	/* si le flag est positionne on attend */
-	while(check_pid==1){
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] check_pid unlocked", __FILE__, __LINE__);
-		#endif
-		sleep(1);
-	}
-	logmsg(LOG_DEBUG, "[%s %i] Launch alert");
+	logmsg(LOG_DEBUG, "[%s %i] Launch alert", __FILE__, __LINE__);
 
 	if(num_pids >= config[CF_MAXTH].valeur.integer){
 		logmsg(LOG_ERR, "[%s %i] Exceed maximun process", __FILE__, __LINE__);
 		return(-1);
 	}
-
-	/* positionne le flag */
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] locked check_pid", __FILE__, __LINE__);
-	#endif
-	check_pid=1;
 
 	pid=fork();
 	if(pid<0){
@@ -239,11 +183,6 @@ int alerte(unsigned char *mac, unsigned char *ip, int alert_level){
 	}
 	if(pid>0){
 		addpid(pid);
-		/* supprime le flag */
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] Unlock check_pid", __FILE__, __LINE__);
-		#endif
-		check_pid=0;
 		return(pid);
 	}
 
@@ -254,7 +193,8 @@ int alerte(unsigned char *mac, unsigned char *ip, int alert_level){
 	snprintf(alert, 5, "%i", alert_level);
 	ret = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string, mac, ip, alert, NULL);
 	if(ret < 0){
-		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s", __FILE__, __LINE__, config[CF_ACTION].valeur.string, errno, errmsg[errno]);
+		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s", __FILE__, __LINE__,
+			config[CF_ACTION].valeur.string, errno, errmsg[errno]);
 		exit(1);
 	}
 	exit(0);

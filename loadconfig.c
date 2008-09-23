@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <malloc.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
@@ -15,13 +14,16 @@ char lowercase(char);
 int convert_int(char*);
 int convert_boolean(char*);
 
-void config_init(void){
+void config_load(void){
 	char c;
 	extern char *optarg;
 	extern int optind;
 	extern int opterr;
-	
- 	optind = 0;
+	FILE *fp;
+	char buffer[4096];
+	char *buf;
+	char msgd[512];
+	int i;
 
 	/* chargement des valeurs par defaut et definition des entrées */
 	config[0].type = 0;
@@ -129,6 +131,7 @@ void config_init(void){
 	config[CF_LOGIP].valeur.integer = TRUE;
 	
 	/* cherche / recharge les parametres de la ligne de commande */
+	optind = 0;
 	strncpy(config_file, CONFIG_FILE, 2048);
 	while ((c = getopt(margc, margv, "f:i:p:e:dD:l:v")) != EOF) {
 		switch (c) {
@@ -182,19 +185,11 @@ void config_init(void){
 			break;
 		}
 	}
-}
 
-void config_load(void){
-	FILE *fp;
-	char *buf;
-	char msgd[512];
-	int i;
-
-	buf = (char *)malloc(4096);
-
-	fp=fopen(config_file, "r");
-	if(fp==NULL){
-		snprintf(msgd, 512, "%s %i fopen: %s - ouverture impossible - chargement de la config par defaut\n", __FILE__, __LINE__, config_file);
+	buf = buffer;
+	fp = fopen(config_file, "r");
+	if(fp == NULL){
+		snprintf(msgd, 512, "[%s %i] don't found %s, loading default config\n", __FILE__, __LINE__, config_file);
 		fprintf(stderr, msgd);
 	} else {
 		while((buf = fgets(buf, 4096, fp)) != NULL){
@@ -205,7 +200,6 @@ void config_load(void){
 		}
 		fclose(fp);
 	}
-	free(buf);
 
 	if(dump==1){
 		for(i=0; i<NUM_PARAMS; i++){
@@ -231,27 +225,18 @@ void config_load(void){
 }
 
 void miseenmemoire(char *buf){
-	char *src;
-	char *m_eq;
-	char *m_end;
-	/*
-	char *gauche, *g;
-	char *droite, *d;
-	*/
+	char *src = NULL;
+	char *m_eq = NULL;
+	char *m_end = NULL;
 	char m_gauche[4096];
 	char m_droite[4096];
-	char *gauche;
-	char *droite;
-	char *g;
-	char *d;
-
+	char *gauche = NULL;
+	char *droite = NULL;
+	char *g = NULL;
+	char *d = NULL;
 	int i;
 	int protection, ok;
 	
-	/*
-	gauche = (char *)malloc(4096);
-	droite = (char *)malloc(4096);
-	*/
 	gauche = m_gauche;
 	droite = m_droite;
 	g = gauche;

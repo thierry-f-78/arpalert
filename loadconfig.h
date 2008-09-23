@@ -61,5 +61,4 @@ char config_file[2048];
 char **margv;
 int margc;
 
-void config_init(void);
 void config_load(void);
