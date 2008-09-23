@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 238 2006-10-06 11:07:14Z  $
+ * $Id: data.c 275 2006-10-12 15:39:24Z  $
  *
  */
 
@@ -240,7 +240,8 @@ void data_dump(void){
 	char msg[35]; //mac(17) + ip(15) + spc + \n + \0
 
 	// if no data dump file
-	if(config[CF_LEASES].valeur.string == NULL) {
+	if(config[CF_LEASES].valeur.string == NULL ||
+	   config[CF_LEASES].valeur.string[0] == 0) {
 		return;
 	}
 	

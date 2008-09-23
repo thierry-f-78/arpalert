@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.c 238 2006-10-06 11:07:14Z  $
+ * $Id: log.c 275 2006-10-12 15:39:24Z  $
  *
  */
 
@@ -48,7 +48,8 @@ void initlog(void){
 		openlog("arpalert", LOG_CONS, LOG_DAEMON);
 	}
 	#endif
-	if(config[CF_LOGFILE].valeur.string != NULL){
+	if(config[CF_LOGFILE].valeur.string != NULL &&
+	   config[CF_LOGFILE].valeur.string[0] != 0){
 		lf = fopen(config[CF_LOGFILE].valeur.string, "a");
 		if(lf == NULL){
 			fprintf(stderr, "[%s %d] fopen[%d]: %s\n",
@@ -69,7 +70,10 @@ void logmsg(int priority, const char *fmt, ...){
 		priority > config[CF_LOGLEVEL].valeur.integer ||
 
 		(
-			config[CF_LOGFILE].valeur.string == NULL &&
+			(
+				config[CF_LOGFILE].valeur.string == NULL ||
+				config[CF_LOGFILE].valeur.string[0] == 0
+			) &&
 			config[CF_DAEMON].valeur.integer == TRUE
 			#ifdef USE_SYSLOG
 			&& config[CF_USESYSLOG].valeur.integer == FALSE
@@ -92,7 +96,8 @@ void logmsg(int priority, const char *fmt, ...){
 	}
 	#endif
 
-	if(config[CF_LOGFILE].valeur.string != NULL){
+	if(config[CF_LOGFILE].valeur.string != NULL &&
+	   config[CF_LOGFILE].valeur.string[0] != 0){
 		fprintf(lf, "%s % 2d %02d:%02d:%02d arpalert: %s\n",
 		        mois[tm->tm_mon],
 		        tm->tm_mday,

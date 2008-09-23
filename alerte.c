@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.c 238 2006-10-06 11:07:14Z  $
+ * $Id: alerte.c 278 2006-10-12 16:05:41Z  $
  *
  */
 
@@ -260,7 +260,8 @@ void alerte(char *mac, char *ip, char *parm_supp, int alert_level){
 	int return_code;
 		  
 	// if the script is not specified, quit function
-	if(config[CF_ACTION].valeur.string == NULL){
+	if(config[CF_ACTION].valeur.string == NULL ||
+	   config[CF_ACTION].valeur.string[0] == 0){
 		return;
 	}
 

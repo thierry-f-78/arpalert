@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: maclist.c 238 2006-10-06 11:07:14Z  $
+ * $Id: maclist.c 275 2006-10-12 15:39:24Z  $
  *
  */
 
@@ -27,11 +27,13 @@
 void maclist_file(char *, int);
 
 void maclist_load(void){
-	if(config[CF_MACLIST].valeur.string != NULL){
+	if(config[CF_MACLIST].valeur.string != NULL &&
+	   config[CF_MACLIST].valeur.string[0] != 0){
 		maclist_file(config[CF_MACLIST].valeur.string, ALLOW);
 	}
 
-	if(config[CF_BLACKLST].valeur.string != NULL){
+	if(config[CF_BLACKLST].valeur.string != NULL &&
+	   config[CF_BLACKLST].valeur.string[0] != 0){
 		maclist_file(config[CF_BLACKLST].valeur.string, DENY);
 	}
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: arpalert.c 238 2006-10-06 11:07:14Z  $
+ * $Id: arpalert.c 275 2006-10-12 15:39:24Z  $
  *
  */
 
@@ -56,7 +56,8 @@ int main(int argc, char **argv){
 	initlog();
 	
 	// load module alert
-	if(config[CF_MOD_ALERT].valeur.string != NULL) module_load();
+	if(config[CF_MOD_ALERT].valeur.string != NULL &&
+	   config[CF_MOD_ALERT].valeur.string[0] != 0) module_load();
 
 	// pcap initialization
 	cap_init();
@@ -108,7 +109,8 @@ void die(int signal){
 	#endif
 
 	// close module
-	if(config[CF_MOD_ALERT].valeur.string != NULL) module_unload();
+	if(config[CF_MOD_ALERT].valeur.string != NULL &&
+	   config[CF_MOD_ALERT].valeur.string[0] != 0) module_unload();
 	
 	exit(0);
 }
