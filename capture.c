@@ -43,6 +43,7 @@ void cap_snif(void){
 	int promisc;
 	int sock_fd;
 	struct ifreq ifr;
+	int retour_cap;
 
 	/* recherche le premier device deisponoible */
 	device = NULL;
@@ -135,9 +136,12 @@ void cap_snif(void){
 	logmsg(LOG_DEBUG, "[%s %i] pcap_setfilter [%s]: ok", __FILE__, __LINE__, FILTER);
 	#endif
 
-	if(pcap_loop(idcap, 0, callback, NULL) <0){
-		logmsg(LOG_ERR, "[%s %i] pcap_loop error: %s", __FILE__, __LINE__, pcap_geterr(idcap));
-		exit(1);
+	while (TRUE) {
+		
+		if(pcap_loop(idcap, 0, callback, NULL)<0){
+			logmsg(LOG_ERR, "[%s %i] pcap_loop error: %s (trying to reconnect)", 
+				__FILE__, __LINE__, pcap_geterr(idcap));
+		}
 	}
 }
 

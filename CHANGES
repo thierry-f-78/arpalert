@@ -1,3 +1,5 @@
+0.4.8: Don't quit the program with if the link is down ... they're attempt to reconnect
+
 0.4.7: Send an alert code 8 if the new mac adress is detected whithout his ip address
 
 0.4.6: launched floods alerts scripts also if the numbers of launched scripts are excedant
