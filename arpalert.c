@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: arpalert.c 86 2006-05-09 07:43:38Z thierry $
+ * $Id: arpalert.c 105 2006-05-10 10:14:39Z thierry $
  *
  */
 
@@ -81,9 +81,7 @@ int main(int argc, char **argv){
 	}
 	
 	// alert
-	if(config[CF_ACTION].valeur.string[0]!=0){
-		alerte_init();
-	}
+	alerte_init();
 
 	// load maclist
 	maclist_reload();
@@ -141,7 +139,7 @@ void dumpmaclist(int signal){
 	if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
 		sens_timeout_clean();
 	}
-	
+
 	alerte_check();
 	cap_abus();
 	alarm(CHECKPOINT);

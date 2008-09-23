@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 89 2006-05-09 15:31:10Z thierry $
+ * $Id: capture.c 105 2006-05-10 10:14:39Z thierry $
  *
  */
 
@@ -736,7 +736,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		ARP_IP_SENDER
 
 		if(config[CF_LOGALLOW].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "seq=%d mac=%s, ip=%s, type=unknow_address", 
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=unknow_address", 
 			       seq, str_eth_mac_sender, str_arp_ip_sender);
 		}
 		if(config[CF_ALRALLOW].valeur.integer == TRUE){

@@ -1,11 +1,15 @@
+1.0.1   * info<at>arpalert<dot>org:
+          error in log format for "unknow_address" alert
+          error in pid structur initialization
+
 1.0.0:  * info<at>arpalert<dot>org:
           rewrite detection code.
-		    rewrite data storage code.
-			 rewrite pid gestion code.
+          rewrite data storage code.
+          rewrite pid gestion code.
           possibility to write comments in allow / deny files.
-			 possibility to ignore mac only new detection
-			 possibility to ignore certains types of detection by mac address
-			   (solution for ip alias)
+          possibility to ignore mac only new detection
+          possibility to ignore certains types of detection by mac address
+            (solution for ip alias)
           for developpers:
           function "make pdf" makes a sources pdf files with syntax color.
           for fun: "make stats" returns the total number of line code (only .c and .h).
@@ -23,7 +27,7 @@
         * robert<dot>perriero<at>gmail<dot>com
           Add suse start script
           Add FC4 start script
-			 Add 2 management scripts
+          Add 2 management scripts
 
 0.4.15: bugfix: probleme in function data_cmp
         rewrite many parts of code.
