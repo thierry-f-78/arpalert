@@ -221,13 +221,16 @@ void config_load(int argc, char *argv[]){
 
 	config[CF_IGNORESELFTEST].type = 2;
 	strncpy(config[CF_IGNORESELFTEST].attrib, "ignore self test", 512);
-	config[CF_IGNORESELFTEST].valeur.integer = FALSE;
+	config[CF_IGNORESELFTEST].valeur.integer = TRUE;
 	
 	/* load command line parameters for config file */
 	strncpy(config_file, CONFIG_FILE, 2048);
 	for(i=1; i<argc; i++){
 		if(argv[i][0]=='-' && argv[i][1]=='f'){
-		       	if(i+1 >= argc)usage();
+		       	if(i+1 >= argc){
+				fprintf(stderr, "Option -f without argument\n");
+				usage();
+			}
 			i++;
 			strncpy(config_file, argv[i], 2048);
 		}
@@ -254,36 +257,55 @@ void config_load(int argc, char *argv[]){
 	for(i=1; i<argc; i++){
 		if(argv[i][0]=='-'){
 			switch(argv[i][1]){
+				case 'f':
+					i++;
+					break;
+
 				case 'i':
-					if(i+1 >= argc)usage();
+					if(i+1 >= argc){
+						fprintf(stderr, "Option -i without argument\n");
+						usage();
+					}
 					i++;
 					strncpy(config[CF_IF].valeur.string, argv[i], 1024);
 					break;
 	
 				case 'p':
-					if(i+1 >= argc)usage();
+					if(i+1 >= argc){
+						fprintf(stderr, "Option -p without argument\n");
+						usage();
+					}
 					i++;
 					strncpy(config[CF_LOCKFILE].valeur.string, argv[i], 1024);
 					break;
 	
 				case 'e':
-					if(i+1 >= argc)usage();
+					if(i+1 >= argc){
+						fprintf(stderr, "Option -e without argument\n");
+						usage();
+					}
 					i++;
 					strncpy(config[CF_ACTION].valeur.string, argv[i], 1024);
 					break;
 				
 				case 'D':
-					if(i+1 >= argc)usage();
+					if(i+1 >= argc){
+						fprintf(stderr, "Option -D without argument\n");
+						usage();
+					}
 					i++;
 					if(argv[i][0] < 48 || argv[i][0] > 55){
-						fprintf(stderr, "Wrong -D parameter");
+						fprintf(stderr, "Wrong -D parameter\n");
 						usage();
 					}
 					config[CF_LOGLEVEL].valeur.integer = argv[i][0] - 48;
 					break;
 	
 				case 'l':
-					if(i+1 >= argc)usage();
+					if(i+1 >= argc){
+						fprintf(stderr, "Option -l without argument\n");
+						usage();
+					}
 					i++;
 					strncpy(config[CF_LEASES].valeur.string, argv[i], 1024);
 					break;
@@ -307,6 +329,7 @@ void config_load(int argc, char *argv[]){
 				case 'h':
 				case '?':
 				default:
+					fprintf(stderr, "Wrong option: -%c\n", argv[i][1]);
 					usage();
 					exit(1);
 					break;
