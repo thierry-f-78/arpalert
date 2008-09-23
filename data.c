@@ -1,31 +1,33 @@
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
 #include "data.h"
 #include "log.h"
-#include "config.h"
 #include "loadconfig.h"
 
-/* Taille de la table de hachage (nombre premier) */
+// hash table size (must be a primary number)
 #define HASH_SIZE 1999
 #define HASH_B 256
 
-/* conversion bin -> hexa */
+// conversion bin -> hexa 
 const char conv[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
-/* conversion hexa -> bin */
-const unsigned char vnoc[103] = {
-	0,0,0,0,0,0,0,0,0,0,            /*  9 */
-	0,0,0,0,0,0,0,0,0,0,            /* 19 */
-	0,0,0,0,0,0,0,0,0,0,            /* 29 */
-	0,0,0,0,0,0,0,0,0,0,            /* 39 */
-	0,0,0,0,0,0,0,0,0,1,            /* 49 */
-	2,3,4,5,6,7,8,9,0,0,            /* 59 */
-	0,0,0,0,0,10,11,12,13,14,       /* 69 */
-	15,0,0,0,0,0,0,0,0,0,           /* 79 */
-	0,0,0,0,0,0,0,0,0,0,            /* 89 */
-	0,0,0,0,0,0,0,10,11,12,         /* 99 */
-	13,14,15                        /* 102 */
+// conversion hexa -> bin
+const u_char vnoc[103] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /*  9 */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 19 */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 29 */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 39 */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 1,    /* 49 */
+	2, 3, 4, 5, 6, 7, 8, 9, 0, 0,    /* 59 */
+	0, 0, 0, 0, 0, 10,11,12,13,14,   /* 69 */
+	15,0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 79 */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 89 */
+	0, 0, 0, 0, 0, 0, 0, 10,11,12,   /* 99 */
+	13,14,15                         /* 102 */
 };
 
 unsigned int data_size;
@@ -98,7 +100,8 @@ void data_add(data_mac *mac, int status,  int ip){
 	#endif
 
 	if(data_size >= config[CF_MAXENTRY].valeur.integer){
-		logmsg(LOG_ERR, "[%s %i] memory up to %i entries: flushing data", __FILE__, __LINE__, config[CF_MAXENTRY].valeur.integer);
+		logmsg(LOG_ERR, "[%s %i] memory up to %i entries: flushing data",
+		       __FILE__, __LINE__, config[CF_MAXENTRY].valeur.integer);
 		data_clean(0);
 	}
 	
@@ -153,7 +156,7 @@ void data_add(data_mac *mac, int status,  int ip){
 void data_dump(void){
 	p_data_element *init_null;
 	data_element *del;
-	unsigned char s_mac[18];
+	char s_mac[18];
 	FILE *fp;
 	char msg[128];
 	
@@ -188,8 +191,8 @@ void data_dump(void){
 				){
 					if(del[0].data.ip.ip != 0){
 						snprintf(msg, 128, "%s %i.%i.%i.%i\n", s_mac, 
-							del[0].data.ip.bytes[0], del[0].data.ip.bytes[1], 
-							del[0].data.ip.bytes[2], del[0].data.ip.bytes[3]);
+							del[0].data.ip.bytes[3], del[0].data.ip.bytes[2], 
+							del[0].data.ip.bytes[1], del[0].data.ip.bytes[0]);
 						fputs(msg, fp);
 					}
 				}
@@ -217,7 +220,8 @@ void data_clean(int timeout){
 		while(1){
 			if(actu != NULL){
 				next = (*actu).next;
-				if((*actu).data.flag == APPEND && ( time(NULL) - (*actu).data.timestamp ) >= timeout){
+				if((*actu).data.flag == APPEND &&
+				   ( time(NULL) - (*actu).data.timestamp ) >= timeout){
 					if(last==(data_element *)init_null){
 						*init_null = next;
 					}else{
@@ -250,7 +254,8 @@ data_pack *data_exist(data_mac *mac){
 	emplacement += data_hash(mac);
 	question = *emplacement;
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Test address 0x%x -> %x", __FILE__, __LINE__, (unsigned int)emplacement, (unsigned int)question);
+	logmsg(LOG_DEBUG, "[%s %i] Test address 0x%x -> %x",
+               __FILE__, __LINE__, (unsigned int)emplacement, (unsigned int)question);
 	#endif
 
 	if(question == NULL)return(NULL);
@@ -281,18 +286,18 @@ unsigned int data_hash(data_mac *mac){
 	return(v);
 }
 
-unsigned int data_cmp(data_mac *mac1, data_mac *mac2){
-	if((*mac1).octet[0] != (*mac2).octet[0]) return(1);
-	if((*mac1).octet[1] != (*mac2).octet[1]) return(1);
-	if((*mac1).octet[2] != (*mac2).octet[2]) return(1);
-	if((*mac1).octet[3] != (*mac2).octet[3]) return(1);
-	if((*mac1).octet[4] != (*mac2).octet[4]) return(1);
-	if((*mac1).octet[5] != (*mac2).octet[5]) return(1);
-	return(0);
+u_int data_cmp(data_mac *mac1, data_mac *mac2){
+	if((*mac1).octet[0] != (*mac2).octet[0]) return(FALSE);
+	if((*mac1).octet[1] != (*mac2).octet[1]) return(FALSE);
+	if((*mac1).octet[2] != (*mac2).octet[2]) return(FALSE);
+	if((*mac1).octet[3] != (*mac2).octet[3]) return(FALSE);
+	if((*mac1).octet[4] != (*mac2).octet[4]) return(FALSE);
+	if((*mac1).octet[5] != (*mac2).octet[5]) return(FALSE);
+	return(TRUE);
 }
 
 /* conversion du type mac vers un string lisible */
-void data_tomac(data_mac bin, unsigned char *buf){
+void data_tomac(data_mac bin, char *buf){
 	buf[0]=conv[bin.octet[0]>>4];
 	buf[1]=conv[bin.octet[0]&0x0f];
 	buf[2]=':';
@@ -313,45 +318,103 @@ void data_tomac(data_mac bin, unsigned char *buf){
 	buf[17]=0;
 }
 
-int data_toip(unsigned char *ip){
-	int ii;
-	int pos, rang;
+// conversion string ip to u_int32_t
+u_int32_t data_toip(char *ip){
+	char *parse;
+	char *begin;
+	u_int conv;
+	int count = 3;
 	data_ip ip_32;
+	char end_char;
 
-	pos = 0;
-	rang=0;
-	ip_32.ip= 0;
-	for(ii=0; (ii <= 15 && ip[ii] != 0); ii++){
-		if(ip[ii]=='.'){
-			pos++;
-			rang=0;
+	begin = ip;
+	parse = ip;
+	while(TRUE){
+		if(*parse == '.' || parse - ip == 15 || *parse == 0){
+			end_char = *parse;
+			*parse = 0;
+			conv = atoi(begin);
+			if(conv > 0xff){
+				logmsg(LOG_ERR, "[%s %d] IP Error: octet %s incorrect",
+				       __FILE__, __LINE__, begin);
+			}
+			if(count < 0){
+				logmsg(LOG_ERR, "[%s %d] IP Error: error in format",
+				       __FILE__, __LINE__);
+			}
+			ip_32.bytes[count] = (u_char)conv;
+			*parse = end_char;
+			if(parse - ip == 15 || *parse == 0){
+				break;
+			}
+			count--;
+			parse++;
+			begin = parse;
+			continue;
+		}		
+		else if(*parse >= '0' && *parse <= '9'){
+			parse++;
 			continue;
 		}
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] ip_32.bytes[%i] = (ip_32.bytes[%i](%i) * 10) + ip[%i](%c - %i) - 48 = %i;", __FILE__, __LINE__, pos, pos, ip_32.bytes[pos], ii, ip[ii], ip[ii], (ip_32.bytes[pos]*10)+ip[ii]-48);
-		#endif
-		ip_32.bytes[pos] = (ip_32.bytes[pos] * 10) + ip[ii] - 48;
-		rang++;
+		else {
+			logmsg(LOG_ERR, "[%s %d] IP Error: unexpected value: %c",
+			       __FILE__, __LINE__, *parse);
+			parse++;
+		}
 	}
 
+	if(count != 0){
+		logmsg(LOG_ERR, "[%s %d] IP Error: error in format",
+		       __FILE__, __LINE__);
+	}
+	
 	return ip_32.ip;
 }
 
 /* conversion d'un string lisible (table arp du noyaux, ...) vers un type mac */
-void data_tohex(unsigned char *macaddr, data_mac *voila){
-	voila->octet[0] =  vnoc[macaddr[1]];
-	voila->octet[0] += vnoc[macaddr[0]] * 16;
-	voila->octet[1] =  vnoc[macaddr[4]];
-	voila->octet[1] += vnoc[macaddr[3]] * 16;
-	voila->octet[2] =  vnoc[macaddr[7]];
-	voila->octet[2] += vnoc[macaddr[6]] * 16;
-	voila->octet[3] =  vnoc[macaddr[10]];
-	voila->octet[3] += vnoc[macaddr[9]] * 16;
-	voila->octet[4] =  vnoc[macaddr[13]];
-	voila->octet[4] += vnoc[macaddr[12]] * 16;
-	voila->octet[5] =  vnoc[macaddr[16]];
-	voila->octet[5] += vnoc[macaddr[15]] * 16;
-	voila->octet[6] =  vnoc[macaddr[19]];
-	voila->octet[6] += vnoc[macaddr[18]] * 16;
+void data_tohex(char *macaddr, data_mac *to_mac){
+	int i;
+	
+	// format verification
+	for(i=0; i<=19; i++) {
+		switch(i){
+			case 0: case 1: case 3: case 4: case 6:
+			case 7: case 9: case 10: case 12: case 13:
+			case 15: case 16:
+				if(macaddr[i] < 'a' && macaddr[i] > 'f' &&
+				   macaddr[i] < 'A' && macaddr[i] > 'F' &&
+				   macaddr[i] < '0' && macaddr[i] > '9'){
+					logmsg(LOG_ERR, "[%s %d] Litteral MAC conversion error: "
+					       "error in format of \"%s\": "
+					       "character %d: [a-fA-F0-9] expected",
+					       __FILE__, __LINE__, macaddr, i);
+					exit(1);
+				}
+				break;
+			case 2: case 5: case 8:
+			case 11: case 14:
+				if(macaddr[i] != ':'){
+					logmsg(LOG_ERR, "[%s %d] Litteral MAC conversion error: "
+					       "error in format of \"%s\": "
+					       "character %d: ':' expected",
+					       __FILE__, __LINE__, macaddr, i);
+					exit(1);
+				}
+				break;
+		}
+	}
+
+	to_mac->octet[0] =  vnoc[(u_char)macaddr[1]];
+	to_mac->octet[0] += vnoc[(u_char)macaddr[0]] * 16;
+	to_mac->octet[1] =  vnoc[(u_char)macaddr[4]];
+	to_mac->octet[1] += vnoc[(u_char)macaddr[3]] * 16;
+	to_mac->octet[2] =  vnoc[(u_char)macaddr[7]];
+	to_mac->octet[2] += vnoc[(u_char)macaddr[6]] * 16;
+	to_mac->octet[3] =  vnoc[(u_char)macaddr[10]];
+	to_mac->octet[3] += vnoc[(u_char)macaddr[9]] * 16;
+	to_mac->octet[4] =  vnoc[(u_char)macaddr[13]];
+	to_mac->octet[4] += vnoc[(u_char)macaddr[12]] * 16;
+	to_mac->octet[5] =  vnoc[(u_char)macaddr[16]];
+	to_mac->octet[5] += vnoc[(u_char)macaddr[15]] * 16;
 }
 

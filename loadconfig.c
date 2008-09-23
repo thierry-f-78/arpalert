@@ -1,7 +1,10 @@
+#include "config.h"
+
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
 #include <stdlib.h>
+
 #include "loadconfig.h"
 #include "log.h"
 
@@ -159,6 +162,10 @@ void config_load(int argc, char *argv[]){
 	strncpy(config[CF_ALERT_UNAUTH_RQ].attrib, "alert on unauth request", 512);
 	config[CF_ALERT_UNAUTH_RQ].valeur.integer = TRUE;
 
+	config[CF_UNAUTH_TO_METHOD].type = 1;
+	strncpy(config[CF_UNAUTH_TO_METHOD].attrib, "unauth ignore time method", 512);
+	config[CF_UNAUTH_TO_METHOD].valeur.integer = 2;
+	
 	config[CF_LOG_ABUS].type = 2;
 	strncpy(config[CF_LOG_ABUS].attrib, "log request abus", 512);
 	config[CF_LOG_ABUS].valeur.integer = TRUE;
@@ -222,7 +229,7 @@ void config_load(int argc, char *argv[]){
 	config[CF_IGNORESELFTEST].type = 2;
 	strncpy(config[CF_IGNORESELFTEST].attrib, "ignore self test", 512);
 	config[CF_IGNORESELFTEST].valeur.integer = TRUE;
-	
+
 	/* load command line parameters for config file */
 	strncpy(config_file, CONFIG_FILE, 2048);
 	for(i=1; i<argc; i++){

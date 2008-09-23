@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <fcntl.h>
 #include <signal.h>
 #include <grp.h>
@@ -16,6 +18,7 @@
 #include "serveur.h"
 #include "alerte.h"
 #include "sens.h"
+#include "sens_timeouts.h"
 
 /* intervalle entre deux checkpoint 
  * le 0 desactve le dump regulier */
@@ -32,7 +35,7 @@ int dumptime = 0;
 int nettoyage = 0;
 
 int main(int argc, char **argv){
-	/* Copie des parametre e la lignes de commande pour analyse lors d'un rechargement de la config */
+	// copie command line parameters
 	margc = argc;
 	margv = argv;
 	flagdump = TRUE;
@@ -64,6 +67,11 @@ int main(int argc, char **argv){
 	data_init();
 	sens_init();
 
+	/* sens_timeouts initializations */
+	if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
+		sens_timeout_init();
+	}
+	
 	/* INIT DES ALERTES */
 	if(config[CF_ACTION].valeur.string[0]!=0){
 		alerte_init();
@@ -121,6 +129,11 @@ void dumpmaclist(int signal){
 		nettoyage = time(NULL);
 	}
 
+	/* clean timeouts */
+	if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
+		sens_timeout_clean();
+	}
+	
 	alerte_check();
 	cap_abus();
 	alarm(CHECKPOINT);

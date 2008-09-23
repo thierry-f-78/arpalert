@@ -8,10 +8,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
 #ifdef USE_SYSLOG
 #include <syslog.h>
 #endif
+
 #include "log.h"
 #include "loadconfig.h"
 

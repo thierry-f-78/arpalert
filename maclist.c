@@ -1,9 +1,11 @@
+#include "config.h"
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include "config.h"
+
 #include "maclist.h"
 #include "data.h"
 #include "loadconfig.h"
@@ -26,8 +28,8 @@ void maclist_load(void){
 void maclist_file(char *file, int level){
 	FILE *fp;	/* pointeur du fichier */
 	char buf;	/* pointeur sur la ligne lue */
-	unsigned char key[17];
-	unsigned char ip[16];
+	char key[17];
+	char ip[16];
 	int ip_32;
 	int qui;
 	int p, ligne, car;

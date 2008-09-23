@@ -22,48 +22,50 @@ typedef struct {
 c_pid *pids;
 int num_pids;
 
-/* initilisation de pids */
+// pid list initialisation 
 void alerte_init(void){
 	pids = (c_pid *)malloc(sizeof(c_pid));
 	num_pids = 0;
 	if(pids == NULL){
-		logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct", __FILE__, __LINE__);
-		exit(-1);
+		logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct",
+		       __FILE__, __LINE__);
+		exit(1);
         }
 }
 
-/* ajout d'un pid a la liste */
+// add a pid to list 
 void addpid(int pid){
 	c_pid *test;
 
-	/* on incremente le nombre d'entree */
+	// increment entries number 
 	num_pids++;
 
-	/* reallocation de la memoire */
+	// adjust memory allocation
 	if(num_pids!=0){
 		test = (c_pid *)realloc(pids, num_pids * sizeof(c_pid));
 		if(test == NULL){
-			logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct", __FILE__, __LINE__);
+			logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct",
+			       __FILE__, __LINE__);
 			exit(1);
 		}
 		pids = test;
 	}
 
-	/* ajout des valeurs */
+	// add values
 	pids[num_pids-1].pid = pid;
 	pids[num_pids-1].time = time(NULL);
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] Add pid %i at position  %i at time %i", __FILE__, __LINE__,
-		pids[num_pids-1].pid, num_pids-1, (unsigned int)pids[num_pids-1].time);
+	       pids[num_pids-1].pid, num_pids-1, (unsigned int)pids[num_pids-1].time);
 	#endif
 }
 
-/* supprimer un pid */
+// delete pid
 void delpid(int pid){
 	int i;
 	c_pid *b1, *b2, *test;
 
-	/* recopie la table en supprimant l'entree enlevee */
+	// copy pid table and delete entrie
 	b1 = pids;
 	b2 = pids;
 	i = 0;
@@ -77,12 +79,12 @@ void delpid(int pid){
 		i++;
 	}
 
-	/* si la table n'est pas vide, realloue la memoire */
+	// if the table is not empty, ajust memory allocation
 	if(num_pids>0){
 		test = (c_pid *)realloc(pids, num_pids * sizeof(c_pid));
 		if(test == NULL){
 			logmsg(LOG_ERR, "[%s %i] Can't reallocate memory [%i] for c_pid struct",
-				__FILE__, __LINE__, num_pids * sizeof(c_pid));
+			       __FILE__, __LINE__, num_pids * sizeof(c_pid));
 			free(pids);
 			exit(1);
 		}
@@ -92,23 +94,8 @@ void delpid(int pid){
 
 void alerte_kill_pid(int signal){
 	int ret;
-	/*int i;*/
 	int status;
 
-	/*
-	i=0;
-	while(i < num_pids){
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] Start waitpid, record n: %i", __FILE__, __LINE__, i);
-		#endif
-		ret = waitpid(pids[i].pid, &status, WNOHANG);
-		if(ret > 0)delpid(pids[i].pid);
-		i++;
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] Stop waitpid", __FILE__, __LINE__);
-		#endif
-	}
-	*/
 	ret = waitpid(0, &status, WNOHANG);
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] pid [%i] ended", __FILE__, __LINE__, ret); 
@@ -131,35 +118,37 @@ void alerte_check(void){
 
 	i = 0;
 	while(i < num_pids){
-		/* va voir si le processus fonctionne */
+		// look if process's running
 		ret = waitpid(pids[i].pid, &status, WNOHANG);
 		#ifdef DEBUG
 		logmsg(LOG_DEBUG, "[%s %i] analyse de pid[%i]: %i, temps: %i, code retour = %i",
-			__FILE__, __LINE__, i, pids[i].pid, (unsigned int)pids[i].time, ret);
+		       __FILE__, __LINE__, i, pids[i].pid, (unsigned int)pids[i].time, ret);
 		#endif
 
-		/* si il fonctionne mais que son temps est depasse */
-		if((time(NULL) - pids[i].time >= config[CF_TIMEOUT].valeur.integer) && (ret==0)){
-			logmsg(LOG_ERR, "[%s %i] kill pid[%i]: %i", __FILE__, __LINE__, i, pids[i].pid);
-			
-			/* on le tue */
+		// if the time is out
+		if((time(NULL) - pids[i].time >= config[CF_TIMEOUT].valeur.integer) &&
+		   (ret==0)){
+			logmsg(LOG_ERR, "[%s %i] kill pid[%i]: %i",
+			       __FILE__, __LINE__, i, pids[i].pid);
+
+			// kill it
 			if(kill(pids[i].pid, 9) < 0){
 				logmsg(LOG_ERR, "[%s %i] I can't kill pid [%i]: %i",
-					__FILE__, __LINE__, i, pids[i].pid);
+				       __FILE__, __LINE__, i, pids[i].pid);
 			}
 		} 
 		#ifdef DEBUG
 		else {
 			logmsg(LOG_DEBUG, "[%s %i] pid[%i]: %i is not timeout",
-				__FILE__, __LINE__, i, pids[i].pid);
+			       __FILE__, __LINE__, i, pids[i].pid);
 		}
 		#endif
 
-		/* si il ne fonctionne plus */
+		// if the process is stopped
 		if(ret==-1){
 			#ifdef DEBUG
 			logmsg(LOG_DEBUG, "[%s %i] pid[%i]: %i is ended, removing from check list",
-				__FILE__, __LINE__, i, pids[i].pid);
+			       __FILE__, __LINE__, i, pids[i].pid);
 			#endif
 
 			/* on l'efface de la liste */
@@ -169,49 +158,47 @@ void alerte_check(void){
 	}
 }
 
-/* genere une alerte */
-int alerte(unsigned char *mac, unsigned char *ip, unsigned char *rq, int alert_level){
+// send an alert
+int alerte(char *mac, char *ip, char *rq, int alert_level){
 	int pid;
 	int ret;
 	char alert[5];
 
-	/* si le script n'est pas defini on quitte */
+	// if the script are no path, quit function
 	if(config[CF_ACTION].valeur.string[0]==0) return(0);
-	
+
+	#ifdef DEBUG	
 	logmsg(LOG_DEBUG, "[%s %i] Launch alert", __FILE__, __LINE__);
+	#endif
 
 	if(num_pids >= config[CF_MAXTH].valeur.integer &&
-		alert_level != 7 && alert_level != 5
-	){
+	   alert_level != 7 && alert_level != 5){
 		logmsg(LOG_ERR, "[%s %i] Exceed maximun process", __FILE__, __LINE__);
-		return(-1);
+		return(1);
 	}
 
 	pid=fork();
 	if(pid<0){
 		logmsg(LOG_ERR, "[%s %i] I can't fork", __FILE__, __LINE__);
-		return(pid);
+		exit(1);
+		//return(pid);
 	}
 	if(pid>0){
 		addpid(pid);
-		/* set signal killchld */
-		/*
-		(void)setsignal(SIGCHLD, alerte_kill_pid);
-		*/
 		return(pid);
 	}
 
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] Attempt to execute \"%s\"", __FILE__, __LINE__,
-		config[CF_ACTION].valeur.string);
+	       config[CF_ACTION].valeur.string);
 	#endif
 	
 	snprintf(alert, 5, "%i", alert_level);
 	ret = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string,
-		mac, ip, rq, alert, (char*)0);
+	             mac, ip, rq, alert, (char*)0);
 	if(ret < 0){
-		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s", __FILE__, __LINE__,
-			config[CF_ACTION].valeur.string, errno, errmsg[errno]);
+		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s",
+		       __FILE__, __LINE__, config[CF_ACTION].valeur.string, errno, errmsg[errno]);
 		exit(1);
 	}
 	exit(0);

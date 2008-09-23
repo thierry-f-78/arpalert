@@ -84,6 +84,10 @@ alert on unauth request = false
 ignore unknown sender = false
 # ignore windows self test
 ignore self test = false
+# suspend time method:
+# 1: ignore all unauth alerts during "anti flood interval" time
+# 2: ignore only tuple (mac address, ip address) during "anti flood interval" time
+unauth ignore time method = 2
 
 # log if the number of request per seconds are > "max request"
 log request abus = true

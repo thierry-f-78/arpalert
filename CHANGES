@@ -1,3 +1,9 @@
+0.4.14: Anti flood system for unauthorized detection by couple 
+        mac sender / ip requested. This system permit to watch all alerts.
+        Anti flood system only by mac sender is also available.
+        Unauthorized request configuration file format change. Now accept the
+        syntax with network mask.
+
 0.4.13: command line errors more verbose
         bugfix: Command line bug with -f parameter corrected
 

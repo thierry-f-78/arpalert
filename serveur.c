@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <signal.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -7,6 +9,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sys/stat.h>
+
 #include "loadconfig.h"
 #include "log.h"
 

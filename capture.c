@@ -31,6 +31,7 @@
 #include "data.h"
 #include "config.h"
 #include "alerte.h"
+#include "sens_timeouts.h"
 
 
 #define SNAP_LEN 1514
@@ -147,7 +148,7 @@ void cap_init(void){
 		free(buf);
 		#endif
 
-		data_tomac(me, (unsigned char *)ethernet);
+		data_tomac(me, ethernet);
 		strncat(filtre, " not ether host ", 1024);
 		strncat(filtre, ethernet, 1024);
 	}
@@ -196,11 +197,18 @@ void cap_sniff(void){
 }
 
 void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
+	/*
 	unsigned char smacs[18];
 	unsigned char smacseth[18];
 	unsigned char ip[16];
 	unsigned char iq[16];
 	unsigned char ip_tmp[16];
+	*/
+	char smacs[18];
+	char smacseth[18];
+	char ip[16];
+	char iq[16];
+	char ip_tmp[16];
 	data_pack *data;
 	data_pack *dataeth;
 	data_mac macs;
@@ -293,24 +301,24 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		macs.octet[5] = buff[base + 6];
 
 		/* ip du questionneur */
-		ip_32.bytes[0] = buff[base + 7];
-		ip_32.bytes[1] = buff[base + 8];
-		ip_32.bytes[2] = buff[base + 9];
-		ip_32.bytes[3] = buff[base + 10];
+		ip_32.bytes[3] = buff[base + 7];
+		ip_32.bytes[2] = buff[base + 8];
+		ip_32.bytes[1] = buff[base + 9];
+		ip_32.bytes[0] = buff[base + 10];
 		
 		/* ip du questionné */
-		ip_33.bytes[0] = buff[base + 17];
-		ip_33.bytes[1] = buff[base + 18];
-		ip_33.bytes[2] = buff[base + 19];
-		ip_33.bytes[3] = buff[base + 20];
+		ip_33.bytes[3] = buff[base + 17];
+		ip_33.bytes[2] = buff[base + 18];
+		ip_33.bytes[1] = buff[base + 19];
+		ip_33.bytes[0] = buff[base + 20];
 
 		data = data_exist(&macs);
 		data_tomac(macs, smacs);
 		
 		snprintf((char *)ip, 16, "%u.%u.%u.%u", 
-			ip_32.bytes[0], ip_32.bytes[1], ip_32.bytes[2], ip_32.bytes[3]);
+			ip_32.bytes[3], ip_32.bytes[2], ip_32.bytes[1], ip_32.bytes[0]);
 		snprintf((char *)iq, 16, "%u.%u.%u.%u", 
-			ip_33.bytes[0], ip_33.bytes[1], ip_33.bytes[2], ip_33.bytes[3]);
+			ip_33.bytes[3], ip_33.bytes[2], ip_33.bytes[1], ip_33.bytes[0]);
 		
 		/****************************************************
 		 * begin of arp dependant traitments 
@@ -336,20 +344,26 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 			}
 			
 			if(dataeth != NULL){
-				if(timeact - dataeth->lastalert[4] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-					dataeth->lastalert[4] = timeact;
-				} else {
-					flag=FALSE;
+				// flood control 
+				if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 1){
+					if(timeact - dataeth->lastalert[4] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+						dataeth->lastalert[4] = timeact;
+					} else {
+						flag=FALSE;
+					}
+				// flood control by tuple (mac / ip)
+				} else if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2 &&
+				          config[CF_ANTIFLOOD_INTER].valeur.integer != 0 ){
+					if(sens_timeout_exist(&maceth, ip_33) == TRUE){
+						flag = FALSE;
+					} else {
+						sens_timeout_add(&maceth, ip_33);
+					}
 				}
 			}		
 			
-			/* if the mac adress is authorized: */
-			if(sens_exist(&macs, broadcast) == TRUE){
-				flag = FALSE;
-			}
-			
 			if(flag==TRUE){
-				if(sens_exist(&macs, ip_33)==FALSE){
+				if(sens_exist(&maceth, ip_33)==FALSE){
 					if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
 						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", 
 						       seq, smacs, ip, iq);
@@ -380,8 +394,8 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 					if(timeact - data->lastalert[0] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
 						data->lastalert[0] = timeact;
 						snprintf((char *)ip_tmp, 16, "%u.%u.%u.%u",
-							data[0].ip.bytes[0], data[0].ip.bytes[1], 
-							data[0].ip.bytes[2], data[0].ip.bytes[3]);
+							data[0].ip.bytes[3], data[0].ip.bytes[2], 
+							data[0].ip.bytes[1], data[0].ip.bytes[0]);
 						if(config[CF_LOGIP].valeur.integer == TRUE){
 							logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change",
 								seq, smacs, ip, ip_tmp); 
@@ -399,14 +413,16 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 					}
 				} else if(data->ip.ip == 0 && ip_32.ip != 0) {
 					if(config[CF_LOGNEW].valeur.integer == TRUE){
-						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new", seq, smacseth, ip);
+						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new",
+						       seq, smacseth, ip);
 					}
 			
 					if(config[CF_ALRNEW].valeur.integer == TRUE){
-						ret = alerte(smacseth, ip, (unsigned char *)"", 3);
+						ret = alerte(smacseth, ip, "", 3);
 						#ifdef DEBUG
 						if(ret > 0){
-							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+							       __FILE__, __LINE__, ret);
 						}
 						#endif
 					}
@@ -438,7 +454,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 						#ifdef DEBUG
 						if(ret > 0){
 							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-								__FILE__, __LINE__, ret);
+							       __FILE__, __LINE__, ret);
 						}
 						#endif
 					}
@@ -459,10 +475,11 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 						}
 	
 						if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
-							ret = alerte(smacseth, ip, (unsigned char *)"", 5);
+							ret = alerte(smacseth, ip, "", 5);
 							#ifdef DEBUG
 							if(ret > 0){
-								logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+								logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+								       __FILE__, __LINE__, ret);
 							}
 							#endif
 						}
@@ -486,10 +503,11 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 			}
 	
 			if(config[CF_ALRNEW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, (unsigned char *)"", 8);
+				ret = alerte(smacseth, ip, "", 8);
 				#ifdef DEBUG
 				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+					       __FILE__, __LINE__, ret);
 				}
 				#endif
 			}
@@ -502,10 +520,11 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 			}
 	
 			if(config[CF_ALRNEW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, (unsigned char *)"", 3);
+				ret = alerte(smacseth, ip, "", 3);
 				#ifdef DEBUG
 				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+					       __FILE__, __LINE__, ret);
 				}
 				#endif
 			}
@@ -526,10 +545,11 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 			}
 
 			if(config[CF_ALRALLOW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, (unsigned char *)"", 1); 
+				ret = alerte(smacseth, ip, "", 1); 
 				#ifdef DEBUG
 				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i", __FILE__, __LINE__, ret);
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i",
+					       __FILE__, __LINE__, ret);
 				}
 				#endif
 			}
@@ -542,14 +562,16 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		timeact - dataeth->lastalert[2] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
 			dataeth->lastalert[2] = timeact;
 			if(config[CF_LOGDENY].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=black_listed", seq, smacseth, ip);
+				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=black_listed",
+				       seq, smacseth, ip);
 			}
 
 			if(config[CF_ALRDENY].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, (unsigned char *)"", 2); 
+				ret = alerte(smacseth, ip, "", 2); 
 				#ifdef DEBUG
 				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i", __FILE__, __LINE__, ret);
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i",
+					       __FILE__, __LINE__, ret);
 				}
 				#endif
 			}

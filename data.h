@@ -32,10 +32,11 @@ void data_reset(void);
 void data_close(void);
 void data_dump(void);
 void data_clean(int);
+u_int data_cmp(data_mac *, data_mac *);
 void data_add(data_mac *, int, int);
 data_pack *data_exist(data_mac *);
-void data_tomac(data_mac, unsigned char *);
-void data_tohex(unsigned char *, data_mac *);
-int data_toip(unsigned char *);
+void data_tomac(data_mac, char *);
+void data_tohex(char *, data_mac *);
+u_int32_t data_toip(char *);
 
 #endif

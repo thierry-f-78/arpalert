@@ -60,8 +60,9 @@
 #define CF_CHROOT           43
 #define CF_USESYSLOG        44
 #define CF_IGNORESELFTEST   45
+#define CF_UNAUTH_TO_METHOD 46
 
-#define NUM_PARAMS          46
+#define NUM_PARAMS          47
 
 int flagdump;
 
