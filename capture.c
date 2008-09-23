@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 471 2007-02-05 02:38:09Z thierry $
+ * $Id: capture.c 485 2007-03-12 18:09:43Z thierry $
  *
  */
 
@@ -933,7 +933,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		(
 			// permit to ignore arp self test
 			config[CF_IGNORESELFTEST].valeur.integer == FALSE ||
-			eth_data->ip.s_addr != arp_ip_rcpt.s_addr
+			arp_ip_sender.s_addr != arp_ip_rcpt.s_addr
 		) &&
 
 		(

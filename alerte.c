@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.c 471 2007-02-05 02:38:09Z thierry $
+ * $Id: alerte.c 485 2007-03-12 18:09:43Z thierry $
  *
  */
 
@@ -278,16 +278,16 @@ void alerte_script(char *mac, char *ip, int alert_level, char *parm_supp,
 	if(config[CF_ALERT_VENDOR].valeur.integer == TRUE){
 		return_code = execlp(config[CF_ACTION].valeur.string,
 		                     config[CF_ACTION].valeur.string,
-	   	                  mac, ip, parm_supp, interface,
-	      	               alert[alert_level], vendor,
+		                     mac, ip, parm_supp, interface,
+		                     alert[alert_level], vendor,
 		                     (char*)0);
 	}
 
 	else {
 		return_code = execlp(config[CF_ACTION].valeur.string,
 		                     config[CF_ACTION].valeur.string,
-	   	                  mac, ip, parm_supp, interface,
-	      	               alert[alert_level], (char*)0);
+		                     mac, ip, parm_supp, interface,
+		                     alert[alert_level], (char*)0);
 	}
 	if(return_code < 0){
 		logmsg(LOG_ERR, "[%s %i] execlp[%d]: %s"

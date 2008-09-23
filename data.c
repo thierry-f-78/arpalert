@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 471 2007-02-05 02:38:09Z thierry $
+ * $Id: data.c 485 2007-03-12 18:09:43Z thierry $
  *
  */
 
@@ -384,6 +384,11 @@ void data_dump(void){
 	int len;
 	char msg[128]; //mac(17) + ip(15) + interface(?) + \n + \0
 
+	// set new times
+	last_dump.tv_sec = current_t.tv_sec;
+	last_dump.tv_usec = current_t.tv_usec;
+	dump_time.tv_sec = -1;
+
 	// if no data dump file
 	if(config[CF_LEASES].valeur.string == NULL ||
 	   config[CF_LEASES].valeur.string[0] == 0) {
@@ -448,10 +453,6 @@ void data_dump(void){
 		       errno, strerror(errno));
 		exit(1);
 	}
-
-	last_dump.tv_sec = current_t.tv_sec;
-	last_dump.tv_usec = current_t.tv_usec;
-	dump_time.tv_sec = -1;
 }
 
 // clean discored mac too old
@@ -585,12 +586,14 @@ void *data_next(struct timeval *tv){
 	}
 
 	// if timeout and dump are sets
+	// next_clean time lowest, then clen
 	else if(time_comp(&dump_time,
 	                  &next_clean) == BIGEST){
-
 		tv->tv_sec = next_clean.tv_sec;
 		tv->tv_usec = next_clean.tv_usec;
 		return data_clean;
+
+	// else dump
 	} else {
 		tv->tv_sec = dump_time.tv_sec;
 		tv->tv_usec = dump_time.tv_usec;

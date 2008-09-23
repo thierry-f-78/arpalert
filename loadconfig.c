@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 471 2007-02-05 02:38:09Z thierry $
+ * $Id: loadconfig.c 485 2007-03-12 18:09:43Z thierry $
  *
  */
 
@@ -461,8 +461,15 @@ void config_load(int argc, char *argv[]){
 		for(i=0; i<NUM_PARAMS; i++){
 			switch(config[i].type){
 				case 0:
-					logmsg(LOG_NOTICE, "%s = \"%s\"",
-					       config[i].attrib, config[i].valeur.string);
+					if(config[i].valeur.string == NULL){
+						logmsg(LOG_NOTICE, "%s = \"\"",
+						       config[i].attrib);
+					}
+
+					else {
+						logmsg(LOG_NOTICE, "%s = \"%s\"",
+						       config[i].attrib, config[i].valeur.string);
+					}
 				break;
 
 				case 1:

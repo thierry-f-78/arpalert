@@ -26,7 +26,7 @@ void dumpmaclist(int);
 
 // set flag signals
 int sigchld = 0;
-int sighup = 0;
+int sighup  = 0;
 int sigstop = 0;
 
 void setsigchld(int signal){
@@ -107,9 +107,9 @@ void signals_func(void){
 
 // get next signal
 void *signals_next(struct timeval *tv){
-	if(sigchld != 0 ||
-	   sighup != 0 ||
-	   sigstop != 0){
+	if(sigchld > 0 ||
+	   sighup  > 0 ||
+	   sigstop > 0){
 		tv->tv_sec = 0;
 		tv->tv_usec = 0;
 		return signals_func;
