@@ -85,6 +85,7 @@ void sens_init(void) {
 		while(1){
 			if((buf[i]>='0' && buf[i]<='9') || \
 			  (buf[i]>='a' && buf[i]<='f') || \
+			  (buf[i]>='A' && buf[i]<='F') || \
 			  buf[i]=='.' || buf[i]==':'){
 				ip[dec]=buf[i];
 				if(dec>17){

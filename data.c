@@ -131,6 +131,13 @@ void data_add(data_mac *mac, int status,  int ip){
 		(*libre).data.flag = status;
 		(*libre).data.ip.ip = ip;
 		(*libre).data.timestamp = time(NULL);
+		(*libre).data.lastalert[0] = 0;
+		(*libre).data.lastalert[1] = 0;
+		(*libre).data.lastalert[2] = 0;
+		(*libre).data.lastalert[3] = 0;
+		(*libre).data.lastalert[4] = 0;
+		(*libre).data.lastalert[5] = 0;
+		(*libre).data.lastalert[6] = 0;
 		(*libre).data.request = 0;
 		(*libre).next = NULL;
 		*add = libre;

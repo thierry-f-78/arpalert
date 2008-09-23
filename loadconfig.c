@@ -5,6 +5,8 @@
 #include "loadconfig.h"
 #include "log.h"
 
+#define OPTIONS "f:i:p:Pe:dwD:l:v"
+
 char msg[4096];
 int dump = 0;
 
@@ -166,15 +168,61 @@ void config_load(void){
 	strncpy(config[CF_DUMP_PAQUET].attrib, "dump paquet", 512);
 	config[CF_DUMP_PAQUET].valeur.integer = FALSE;
 
+	config[CF_PROMISC].type = 2;
+	strncpy(config[CF_PROMISC].attrib, "promiscuous", 512);
+	config[CF_PROMISC].valeur.integer = FALSE;
+
+	config[CF_ANTIFLOOD_INTER].type = 1;
+	strncpy(config[CF_ANTIFLOOD_INTER].attrib, "anti flood interval", 512);
+	config[CF_ANTIFLOOD_INTER].valeur.integer = 10; /* 1 mois */
+	
+	config[CF_ANTIFLOOD_GLOBAL].type = 1;
+	strncpy(config[CF_ANTIFLOOD_GLOBAL].attrib, "anti flood global", 512);
+	config[CF_ANTIFLOOD_GLOBAL].valeur.integer = 50; /* 1 mois */
+
+	config[CF_LOG_FLOOD].type = 2;
+	strncpy(config[CF_LOG_FLOOD].attrib, "log flood", 512);
+	config[CF_LOG_FLOOD].valeur.integer = TRUE;
+
+	config[CF_ALERT_ON_FLOOD].type = 2;
+	strncpy(config[CF_ALERT_ON_FLOOD].attrib, "alert on flood", 512);
+	config[CF_ALERT_ON_FLOOD].valeur.integer = TRUE;
+	
+	config[CF_IGNORE_ME].type = 2;
+	strncpy(config[CF_IGNORE_ME].attrib, "ignore me", 512);
+	config[CF_IGNORE_ME].valeur.integer = TRUE;
+	
 	/* cherche / recharge les parametres de la ligne de commande */
 	optind = 0;
 	strncpy(config_file, CONFIG_FILE, 2048);
-	while ((c = getopt(margc, margv, "f:i:p:e:dwD:l:v")) != EOF) {
+	while ((c = getopt(margc, margv, OPTIONS)) != EOF) {
 		switch (c) {
 			case 'f': 
 				strncpy(config_file, optarg, 2048);
 			break;
-			
+		}
+	}
+
+	buf = buffer;
+	fp = fopen(config_file, "r");
+	if(fp == NULL){
+		snprintf(msgd, 512, "[%s %i] don't found %s, loading default config\n", __FILE__, __LINE__, config_file);
+		fprintf(stderr, msgd);
+	} else {
+		while((buf = fgets(buf, 4096, fp)) != NULL){
+			miseenforme(buf);
+			if(buf[0] != 0){
+				miseenmemoire(buf);
+			}
+		}
+		fclose(fp);
+	}
+
+	/* cherche / recharge les parametres de la ligne de commande */
+	optind = 0;
+	strncpy(config_file, CONFIG_FILE, 2048);
+	while ((c = getopt(margc, margv, OPTIONS)) != EOF) {
+		switch (c) {
 			case 'i':
 				strncpy(config[CF_IF].valeur.string, optarg, 1024);
 			break;
@@ -183,6 +231,10 @@ void config_load(void){
 				strncpy(config[CF_LOCKFILE].valeur.string, optarg, 1024);
 			break;
 
+			case 'P':
+				config[CF_PROMISC].valeur.integer = TRUE;
+			break;
+				
 			case 'e':
 				strncpy(config[CF_ACTION].valeur.string, optarg, 1024);
 			break;
@@ -226,21 +278,6 @@ void config_load(void){
 		}
 	}
 
-	buf = buffer;
-	fp = fopen(config_file, "r");
-	if(fp == NULL){
-		snprintf(msgd, 512, "[%s %i] don't found %s, loading default config\n", __FILE__, __LINE__, config_file);
-		fprintf(stderr, msgd);
-	} else {
-		while((buf = fgets(buf, 4096, fp)) != NULL){
-			miseenforme(buf);
-			if(buf[0] != 0){
-				miseenmemoire(buf);
-			}
-		}
-		fclose(fp);
-	}
-
 	if(dump==1){
 		for(i=0; i<NUM_PARAMS; i++){
 			switch(config[i].type){
@@ -254,9 +291,9 @@ void config_load(void){
 
 				case 2:
 					if(config[i].valeur.integer == TRUE){
-						printf("%s = TRUE\n", config[i].attrib);
+						printf("%s = true\n", config[i].attrib);
 					} else {
-						printf("%s = FALSE\n", config[i].attrib);
+						printf("%s = false\n", config[i].attrib);
 					}
 				break;
 			}
@@ -365,9 +402,11 @@ int convert_boolean(char *buf){
 		case 'o': return(TRUE);
 		case 't': return(TRUE);
 		case 'y': return(TRUE);
+		case '1': return(TRUE);
 
 		case 'n': return(FALSE);
 		case 'f': return(FALSE);
+		case '0': return(FALSE);
 	}
 	return(FALSE);
 }

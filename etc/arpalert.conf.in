@@ -23,6 +23,9 @@ interface			= eth0
 # 6: ethernet mac address different from arp mac address
 Action on detect		= ""
 
+# permit to ignore packets whith the lessons interface mac address
+Ignore me 			= true
+
 # script execution timeout (seconds)
 Execution timeout		= 10
 
@@ -40,6 +43,13 @@ Mac timeout			= 259200
 
 # after this limit the memory hash is cleaned (protect to arp flood)
 Max entry               	= 1000000
+
+# this permit to send only one mismatch alert in this time (in seconds)
+anti flood interval		= 10
+
+# if the number of arp request in seconds exceed this value, all alerts are ignored for 
+# "anti flood interval" time
+anti flood global		= 50
 
 # log if the adress is referenced in hash but is not in white list
 log referenced address		= false
@@ -73,3 +83,7 @@ Max request			= 1000000
 # log if the ethernet mac address are different than the arp amc address (only for requestor)
 log mac error			= true
 alert on mac error		= true
+
+# log if have too many arp request per seconds
+log flood			= true
+alert on flood			= true

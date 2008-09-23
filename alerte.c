@@ -181,7 +181,9 @@ int alerte(unsigned char *mac, unsigned char *ip, unsigned char *rq, int alert_l
 	
 	logmsg(LOG_DEBUG, "[%s %i] Launch alert", __FILE__, __LINE__);
 
-	if(num_pids >= config[CF_MAXTH].valeur.integer){
+	if(num_pids >= config[CF_MAXTH].valeur.integer &&
+		alert_level != 7 && alert_level != 5
+	){
 		logmsg(LOG_ERR, "[%s %i] Exceed maximun process", __FILE__, __LINE__);
 		return(-1);
 	}

@@ -49,8 +49,14 @@
 #define CF_ALR_BOGON		32
 #define CF_IGNORE_UNKNOW	33
 #define CF_DUMP_PAQUET		34
+#define CF_PROMISC		35
+#define CF_ANTIFLOOD_INTER	36
+#define CF_ANTIFLOOD_GLOBAL	37
+#define CF_LOG_FLOOD		38
+#define CF_ALERT_ON_FLOOD	39
+#define CF_IGNORE_ME		40
 
-#define NUM_PARAMS  		35
+#define NUM_PARAMS  		41
 
 int flagdump;
 

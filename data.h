@@ -22,6 +22,7 @@ typedef struct {
 	int flag;               /*0: @ok 1: @alert 2: new */
 	data_ip ip;
 	int timestamp;
+	int lastalert[7];
 	int request;
 } data_pack;
 				      

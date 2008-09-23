@@ -2,6 +2,7 @@
 #include <pcap-bpf.h>
 #include <stdlib.h>
 #include <net/if.h>
+#include <sys/ioctl.h>
 #include <net/ethernet.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -15,6 +16,7 @@
 #include "config.h"
 #include "alerte.h"
 
+
 #define SNAP_LEN 1514
 /*
 #define FILTER "arp or rarp"
@@ -25,16 +27,23 @@
 int seq = 0;
 int abus = 50;
 int base = 22;
+int count = 0;
+int count_t = 0;
+data_mac me;
 
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 
 void cap_snif(void){
 	char err[PCAP_ERRBUF_SIZE];
 	char *device;
+	char ethernet[18];
+	char filtre[1024];
 	pcap_t *idcap;
-	bpf_u_int32 netp, maskp;
 	struct bpf_program bp;
-	
+	int promisc;
+	int sock_fd;
+	struct ifreq ifr;
+
 	/* recherche le premier device deisponoible */
 	device = NULL;
 
@@ -54,18 +63,46 @@ void cap_snif(void){
 		device=NULL;
 	}
 
+	/* fiond my arp adresses */
+	strncpy(filtre, FILTER, 1024);
+	
+	if(config[CF_IGNORE_ME].valeur.integer == TRUE){
+		if((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){
+			logmsg(LOG_ERR, "[%s %i] Error in socket creation", __FILE__, __LINE__);
+			exit(1);
+		}
+		
+		memset(&ifr, 0, sizeof(ifr));
+		strncpy (ifr.ifr_name, device, sizeof(ifr.ifr_name));
+
+		if (ioctl(sock_fd, SIOCGIFHWADDR, &ifr) == -1 ) {
+			logmsg(LOG_ERR, "[%s %i] Error in ioctl call", __FILE__, __LINE__);
+			exit(1);
+		}
+
+		me.octet[0] = ifr.ifr_addr.sa_data[0];
+		me.octet[1] = ifr.ifr_addr.sa_data[1];
+		me.octet[2] = ifr.ifr_addr.sa_data[2];
+		me.octet[3] = ifr.ifr_addr.sa_data[3];
+		me.octet[4] = ifr.ifr_addr.sa_data[4];
+		me.octet[5] = ifr.ifr_addr.sa_data[5];
+
+		data_tomac(me, &ethernet);
+		strncat(filtre, " not ether host ", 1024);
+		strncat(filtre, ethernet , 1024);
+	}
+	
 	/* initialise l'interface */
-	if((idcap = pcap_open_live(device, SNAP_LEN, 0, 0, err)) == NULL){
+	if(config[CF_PROMISC].valeur.integer==TRUE){
+		promisc = 1;
+	} else {
+		promisc = 0;
+	}
+	if((idcap = pcap_open_live(device, SNAP_LEN, promisc, 0, err)) == NULL){
 		logmsg(LOG_ERR, "[%s %i] pcap_open_live error: %s", __FILE__, __LINE__, err);
 		exit(1);
 	}
 
-	/* recupere les parametre de l'interface */
-	if (pcap_lookupnet(device, &netp, &maskp, err) < 0) {
-		logmsg(LOG_ERR, "[%s %i] pcap_lookupnet error: %s", __FILE__, __LINE__, err);
-		exit(1);
-	}
- 
 	logmsg(LOG_DEBUG, "[%s %i] pcap link type:  %s", __FILE__, __LINE__,
 		pcap_datalink_val_to_name(pcap_datalink(idcap)));
 	switch(pcap_datalink(idcap)){
@@ -78,12 +115,12 @@ void cap_snif(void){
 			break;
 
 		default:
-			base = 21;
-			break;
+			logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: unrecognied link", __FILE__, __LINE__);
+			exit(1);
 	}
 	
 	/* initilise le filtre: */
-	if(pcap_compile(idcap, &bp, FILTER, 0x100, maskp) < 0){
+	if(pcap_compile(idcap, &bp, filtre, 0x100, /*maskp*/ 0) < 0){
 		logmsg(LOG_ERR, "[%s %i] pcap_compile error: %s", __FILE__, __LINE__, pcap_geterr(idcap));
 		exit(1);
 	}
@@ -121,6 +158,10 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	int timeact;
 	int i;
 
+	broadcast.bytes[0] = 255;
+	broadcast.bytes[1] = 255;
+	broadcast.bytes[2] = 255;
+	broadcast.bytes[3] = 255;
 	smacs[0]=0;
 	smacseth[0]=0;
 	strcpy((char *)&ip, "0.0.0.0");
@@ -128,6 +169,11 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	ip_32.ip=0;
 	ip_33.ip=0;
 	timeact=time(NULL);
+	
+	if(count > config[CF_ANTIFLOOD_GLOBAL].valeur.integer \
+		&& timeact - count_t < config[CF_ANTIFLOOD_INTER].valeur.integer) {
+		return;
+	}
 	
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] Capture packet", __FILE__, __LINE__);
@@ -148,7 +194,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	maceth.octet[3] = buff[9];
 	maceth.octet[4] = buff[10];
 	maceth.octet[5] = buff[11];
-	
+
 	dataeth = data_exist(&maceth);
 	data_tomac(maceth, smacseth);
 
@@ -157,6 +203,33 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	/* is an arp who-has ? */
 	if(buff[base + 0] == 1 && buff[12] == 8 && buff[13] == 6) {
 	
+		/* general flood detection */
+		if(count_t == timeact){
+			count ++;
+			#ifdef DEBUG
+			logmsg(LOG_DEBUG, "count=%d", count);
+			#endif
+		} else {
+			count = 1;
+			count_t = timeact;
+		}
+		if(count > config[CF_ANTIFLOOD_GLOBAL].valeur.integer) {
+			if(config[CF_LOG_FLOOD].valeur.integer == TRUE){
+				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=flood",
+				       seq, smacs, ip, iq);
+			}
+			if(config[CF_ALERT_ON_FLOOD].valeur.integer == TRUE){
+				ret = alerte(smacs, ip, iq, 7);
+				#ifdef DEBUG
+				if(ret > 0){
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+						__FILE__, __LINE__, ret);
+				}
+				#endif
+			}
+			return;
+		}
+		
 		/* mac du poseur de question */
 		macs.octet[0] = buff[base + 1];
 		macs.octet[1] = buff[base + 2];
@@ -191,22 +264,31 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		
 		/* non authorized request */
 		if(config[CF_AUTHFILE].valeur.string[0]!=0){
-			broadcast.bytes[0] = 255;
-			broadcast.bytes[1] = 255;
-			broadcast.bytes[2] = 255;
-			broadcast.bytes[3] = 255;
 			flag=TRUE;
 			if(config[CF_IGNORE_UNKNOW].valeur.integer == TRUE){
 				if(data == NULL){
 					flag=FALSE;
-				}else{
+				} else {
 					if(data[0].flag != ALLOW){
 						flag=FALSE;
 					}
 				}
 			}
 			
-			if(sens_exist(&macs, broadcast)==FALSE && flag==TRUE){
+			if(dataeth != NULL){
+				if(timeact - dataeth->lastalert[4] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+					dataeth->lastalert[4] = timeact;
+				} else {
+					flag=FALSE;
+				}
+			}		
+			
+			/* if the mac adress is authorized: */
+			if(sens_exist(&macs, broadcast) == TRUE){
+				flag = FALSE;
+			}
+			
+			if(flag==TRUE){
 				if(sens_exist(&macs, ip_33)==FALSE){
 					if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
 						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", 
@@ -227,24 +309,33 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 
 		/* test ip change */
 		if(data != NULL){
-			if(data[0].ip.ip != ip_32.ip){
+			#ifdef DEBUG
+			logmsg(LOG_DEBUG, "[%s %i] test ip change: %d - %d > %d", 
+				__FILE__, __LINE__, timeact, data->lastalert[0], config[CF_ANTIFLOOD_INTER].valeur.integer);
+			#endif
+			if(data[0].ip.ip != ip_32.ip
+			&& data[0].ip.ip != broadcast.ip
+			){
 				if(data[0].ip.ip != 0 && ip_32.ip != 0){
-					snprintf((char *)ip_tmp, 16, "%u.%u.%u.%u",
-						data[0].ip.bytes[0], data[0].ip.bytes[1], 
-						data[0].ip.bytes[2], data[0].ip.bytes[3]);
-					if(config[CF_LOGIP].valeur.integer == TRUE){
-						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change",
-							seq, smacs, ip, ip_tmp); 
-					}
+					if(timeact - data->lastalert[0] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+						data->lastalert[0] = timeact;
+						snprintf((char *)ip_tmp, 16, "%u.%u.%u.%u",
+							data[0].ip.bytes[0], data[0].ip.bytes[1], 
+							data[0].ip.bytes[2], data[0].ip.bytes[3]);
+						if(config[CF_LOGIP].valeur.integer == TRUE){
+							logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change",
+								seq, smacs, ip, ip_tmp); 
+						}	
 				
-					if(config[CF_ALRIP].valeur.integer == TRUE){
-						ret = alerte(smacseth, ip, ip_tmp, 0); 
-						#ifdef DEBUG
-						if(ret > 0){
-							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-								__FILE__, __LINE__, ret);
+						if(config[CF_ALRIP].valeur.integer == TRUE){
+							ret = alerte(smacseth, ip, ip_tmp, 0); 
+							#ifdef DEBUG
+							if(ret > 0){
+								logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+									__FILE__, __LINE__, ret);
+							}
+							#endif
 						}
-						#endif
 					}
 				}
 				data[0].ip.ip = ip_32.ip;
@@ -253,25 +344,30 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		}
 
 		/* error with ethernet mac and arp mac*/
-		if(macs.octet[0]!=maceth.octet[0] || \
-		   macs.octet[1]!=maceth.octet[1] || \
-		   macs.octet[2]!=maceth.octet[2] || \
-		   macs.octet[3]!=maceth.octet[3] || \
-		   macs.octet[4]!=maceth.octet[4] || \
-		   macs.octet[5]!=maceth.octet[5]){
-			if(config[CF_LOG_BOGON].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_error",
-				seq, smacseth, ip, smacs);
-			}
-
-			if(config[CF_ALR_BOGON].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, smacs, 6);
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-						__FILE__, __LINE__, ret);
+		if(dataeth != NULL){
+			if(timeact - dataeth->lastalert[6] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+				dataeth->lastalert[6] = timeact;
+				if(macs.octet[0]!=maceth.octet[0] || \
+				   macs.octet[1]!=maceth.octet[1] || \
+				   macs.octet[2]!=maceth.octet[2] || \
+				   macs.octet[3]!=maceth.octet[3] || \
+				   macs.octet[4]!=maceth.octet[4] || \
+				   macs.octet[5]!=maceth.octet[5]){
+					if(config[CF_LOG_BOGON].valeur.integer == TRUE){
+						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_error",
+						seq, smacseth, ip, smacs);
+					}
+		
+					if(config[CF_ALR_BOGON].valeur.integer == TRUE){
+						ret = alerte(smacseth, ip, smacs, 6);
+						#ifdef DEBUG
+						if(ret > 0){
+							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
+								__FILE__, __LINE__, ret);
+						}
+						#endif
+					}
 				}
-				#endif
 			}
 		}
 
@@ -280,18 +376,21 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 			if(dataeth[0].timestamp == timeact){
 				dataeth[0].request++;
 				if(dataeth[0].request == config[CF_ABUS].valeur.integer + 1){
-					if(config[CF_LOG_ABUS].valeur.integer == TRUE){
-						logmsg(LOG_NOTICE, "sec=%d, mac=%s, ip=%s, type=rqabus", 
-							seq, smacseth, ip);
-					}
-
-					if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
-						ret = alerte(smacseth, ip, "", 5);
-						#ifdef DEBUG
-						if(ret > 0){
-							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+					if(timeact - dataeth->lastalert[5] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+						dataeth->lastalert[5] = timeact;
+						if(config[CF_LOG_ABUS].valeur.integer == TRUE){
+							logmsg(LOG_NOTICE, "sec=%d, mac=%s, ip=%s, type=rqabus", 
+								seq, smacseth, ip);
 						}
-						#endif
+	
+						if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
+							ret = alerte(smacseth, ip, (unsigned char *)"", 5);
+							#ifdef DEBUG
+							if(ret > 0){
+								logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+							}
+							#endif
+						}
 					}
 				}
 			} else {
@@ -311,7 +410,7 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		}
 
 		if(config[CF_ALRNEW].valeur.integer == TRUE){
-			ret = alerte(smacseth, ip, "", 3);
+			ret = alerte(smacseth, ip, (unsigned char *)"", 3);
 			#ifdef DEBUG
 			if(ret > 0){
 				logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
@@ -325,14 +424,16 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	
 	/* si entrée ajoutée mais non reference */
 	if(dataeth != NULL){
-		if(dataeth[0].flag == APPEND){
+		if(dataeth[0].flag == APPEND && 
+		timeact - dataeth->lastalert[1] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+			dataeth->lastalert[1] = timeact;
 			if(config[CF_LOGALLOW].valeur.integer == TRUE){
 				logmsg(LOG_NOTICE, "seq=%d mac=%s, ip=%s, type=unknow_address", 
 					seq, smacseth, ip);
 			}
 
 			if(config[CF_ALRALLOW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, "", 1); 
+				ret = alerte(smacseth, ip, (unsigned char *)"", 1); 
 				#ifdef DEBUG
 				if(ret > 0){
 					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i", __FILE__, __LINE__, ret);
@@ -344,13 +445,15 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	
 	/* si entree interdite */
 	if(dataeth != NULL){
-		if(dataeth[0].flag == DENY){
+		if(dataeth[0].flag == DENY &&
+		timeact - dataeth->lastalert[2] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+			dataeth->lastalert[2] = timeact;
 			if(config[CF_LOGDENY].valeur.integer == TRUE){
 				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=black_listed", seq, smacseth, ip);
 			}
 
 			if(config[CF_ALRDENY].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, "", 2); 
+				ret = alerte(smacseth, ip, (unsigned char *)"", 2); 
 				#ifdef DEBUG
 				if(ret > 0){
 					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i", __FILE__, __LINE__, ret);
@@ -360,7 +463,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		}
 		
 		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] Mac sender %s ok", __FILE__, __LINE__, smacs);
 		logmsg(LOG_DEBUG, "[%s %i] Capture ended", __FILE__, __LINE__);
 		#endif
 	}
