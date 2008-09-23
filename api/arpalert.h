@@ -49,7 +49,3 @@ char *arpalert_alert_name[] = {
  */
 void mod_alert(int type, int nargs, void **data);
 
-/* module initialisation */
-void mod_load(char *config);
-void mod_unload(void);
-

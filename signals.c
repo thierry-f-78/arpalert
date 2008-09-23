@@ -91,6 +91,7 @@ void signals_func(void){
 		maclist_reload();
 		sens_reload();
 		macname_reload();
+		logfile_reload();
 	}
 	// SIGQUIT
 	if(sigstop > 0){

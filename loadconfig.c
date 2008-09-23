@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 531 2007-08-03 18:49:58Z thierry $
+ * $Id: loadconfig.c 578 2007-08-27 13:57:26Z thierry $
  *
  */
 
@@ -42,6 +42,7 @@ void usage(){
 	"    -e script:    script executed whith alerts\n"
 	"    -D loglevel:  loglevel (0 to 7)\n"
 	"    -l leases:    file to store mac addresses\n"
+	"    -m module:    module file to load\n"
 	"    -d:           run as daemon\n"
 	"    -F:           run in foreground\n"
 	"    -v:           dump config\n"
@@ -424,6 +425,18 @@ void config_load(int argc, char *argv[]){
 					config[CF_LEASES].valeur.string = strdup(argv[i]);
 					break;
 	
+				case 'm':
+					if(i+1 >= argc){
+						logmsg(LOG_ERR, "Option -m without argument");
+						usage();
+					}
+					i++;
+					if(config[CF_MOD_ALERT].valeur.string != NULL){
+						free(config[CF_MOD_ALERT].valeur.string);
+					}
+					config[CF_MOD_ALERT].valeur.string = strdup(argv[i]);
+					break;
+
 				case 'v':
 					dump = 1;
 					break;

@@ -1,3 +1,9 @@
+2.0.8   * info<at>arpalert<dot>org
+          install API include
+          close and reopen the logfile on sighup
+          change type of ip arg passed to module
+          bug with module options
+
 2.0.7   * info<at>arpalert<dot>org
           minor openbsd bugfix (thanks Andy)
           very minor code optimization

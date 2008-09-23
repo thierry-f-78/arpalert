@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.h 531 2007-08-03 18:49:58Z thierry $
+ * $Id: log.h 578 2007-08-27 13:57:26Z thierry $
  *
  */
 
@@ -21,6 +21,9 @@
 // open log file before chrooting
 // send init and open syslog before chrooting
 void initlog(void);
+
+// rotate log file
+void logfile_reload(void);
 
 // send log message
 void logmsg(int, const char *, ...);

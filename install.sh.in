@@ -21,6 +21,7 @@ config_dir="@sysconfdir@/arpalert"
 leases_dir="@localstatedir@/lib/arpalert"
 lock_dir="@localstatedir@/run"
 log_dir="@localstatedir@/log"
+includedir="@includedir@/"
 
 # make all directories
 mkdir -p ${DESTDIR}${sbindir}
@@ -28,6 +29,7 @@ mkdir -p ${DESTDIR}${leases_dir}
 mkdir -p ${DESTDIR}${lock_dir}
 mkdir -p ${DESTDIR}${log_dir}
 mkdir -p ${DESTDIR}${config_dir} 
+mkdir -p ${DESTDIR}${includedir} 
 mkdir -p ${DESTDIR}${mandir}/man8
 
 # install man
@@ -35,6 +37,9 @@ cp -f doc/arpalert.8 ${DESTDIR}${mandir}/man8
 
 # copy oui list
 cp -f etc/oui.txt ${DESTDIR}${config_dir}
+
+# copy API
+cp -f api/arpalert.h ${DESTDIR}${includedir}
 
 # insall binary
 cp -f arpalert ${DESTDIR}${sbindir}

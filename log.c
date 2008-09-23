@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.c 531 2007-08-03 18:49:58Z thierry $
+ * $Id: log.c 578 2007-08-27 13:57:26Z thierry $
  *
  */
 
@@ -26,7 +26,7 @@
 
 extern int errno;
 
-FILE *lf;
+FILE *lf = NULL;
 const char *mois[12] = {
 	"Jan",
 	"Feb",
@@ -68,6 +68,36 @@ void initlog(void){
 		}
 	}
 	file_initialized = TRUE;
+}
+
+void logfile_reload(void) {
+	int ret_code;
+
+	// check if logfile is used
+	if(config[CF_LOGFILE].valeur.string == NULL ||
+	   config[CF_LOGFILE].valeur.string[0] == '\0') {
+		return;
+	}
+
+	// if opened, close
+	if (lf != NULL) {
+		ret_code = fclose(lf);
+		if (ret_code != 0) {
+			logmsg(LOG_ERR, "[%s %d] fclose(%s): %s",
+			       __FILE__, __LINE__,
+			       config[CF_LOGFILE].valeur.string,
+			       strerror(errno));
+		}
+	}
+
+	// open logs
+	lf = fopen(config[CF_LOGFILE].valeur.string, "a");
+	if(lf == NULL){
+		logmsg(LOG_ERR, "[%s %d] fopen[%d] (%s): %s",
+		       __FILE__, __LINE__,
+		       errno, config[CF_LOGFILE].valeur.string,
+		       strerror(errno));
+	}
 }
 
 void logmsg(int priority, const char *fmt, ...){

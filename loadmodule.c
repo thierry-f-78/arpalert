@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadmodule.c 531 2007-08-03 18:49:58Z  $
+ * $Id: loadmodule.c 578 2007-08-27 13:57:26Z  $
  *
  */
 
@@ -134,7 +134,7 @@ void alerte_mod(struct ether_addr *mac_sender,
 
 	args[0] = (void *)interface;
 	args[1] = (void *)mac_sender;
-	args[2] = (void *)&ip_sender;
+	args[2] = (void *)ip_sender.s_addr;
 	switch(type){
 		case 0:
 		case 4:

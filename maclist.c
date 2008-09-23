@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: maclist.c 531 2007-08-03 18:49:58Z thierry $
+ * $Id: maclist.c 578 2007-08-27 13:57:26Z thierry $
  *
  */
 

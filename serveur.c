@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.c 531 2007-08-03 18:49:58Z thierry $
+ * $Id: serveur.c 578 2007-08-27 13:57:26Z thierry $
  *
  */
 
@@ -89,7 +89,7 @@ void separe(void){
 	// open lock/pid file
 	fd = open(config[CF_LOCKFILE].valeur.string, O_RDWR|O_CREAT, 0640);
 	if(fd < 0){
-		logmsg(LOG_ERR, "[%s %i] open(%s)[%d]: %s",
+		logmsg(LOG_ERR, "[%s %i] CF_LOCKFILE open(\"%s\")[%d]: %s",
 		       __FILE__, __LINE__, config[CF_LOCKFILE].valeur.string, errno, strerror(errno));
 		exit(1);
 	}

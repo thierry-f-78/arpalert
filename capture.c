@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 531 2007-08-03 18:49:58Z thierry $
+ * $Id: capture.c 578 2007-08-27 13:57:26Z thierry $
  *
  */
 
@@ -282,46 +282,46 @@ void cap_init(void){
 	log_bitfield   = 0;
 
 	// init alert system
-	#define IS_CONF(x) config[x].valeur.integer == TRUE
+	#define IS_CONF(x) config[(x)].valeur.integer == TRUE
 	if(IS_CONF(CF_LOG_FLOOD))       log_bitfield   |= FLAG_FLOOD;
 	if(IS_CONF(CF_ALERT_FLOOD))     alert_bitfield |= FLAG_FLOOD;
-	if(IS_CONF(CF_MOD_FLOOD))       log_bitfield   |= FLAG_FLOOD;
+	if(IS_CONF(CF_MOD_FLOOD))       mod_bitfield   |= FLAG_FLOOD;
 
 	if(IS_CONF(CF_LOG_NEWMAC))      log_bitfield   |= FLAG_NEWMAC;
 	if(IS_CONF(CF_ALERT_NEWMAC))    alert_bitfield |= FLAG_NEWMAC;
-	if(IS_CONF(CF_MOD_NEWMAC))      log_bitfield   |= FLAG_NEWMAC;
+	if(IS_CONF(CF_MOD_NEWMAC))      mod_bitfield   |= FLAG_NEWMAC;
 
 	if(IS_CONF(CF_LOG_NEW))         log_bitfield   |= FLAG_NEW;
 	if(IS_CONF(CF_ALERT_NEW))       alert_bitfield |= FLAG_NEW;
-	if(IS_CONF(CF_MOD_NEW))         log_bitfield   |= FLAG_NEW;
+	if(IS_CONF(CF_MOD_NEW))         mod_bitfield   |= FLAG_NEW;
 
 	if(IS_CONF(CF_LOG_MACCHG))      log_bitfield   |= FLAG_MACCHG;
 	if(IS_CONF(CF_ALERT_MACCHG))    alert_bitfield |= FLAG_MACCHG;
-	if(IS_CONF(CF_MOD_MACCHG))      log_bitfield   |= FLAG_MACCHG;
+	if(IS_CONF(CF_MOD_MACCHG))      mod_bitfield   |= FLAG_MACCHG;
 
 	if(IS_CONF(CF_LOG_IPCHG))       log_bitfield   |= FLAG_IPCHG;
 	if(IS_CONF(CF_ALERT_IPCHG))     alert_bitfield |= FLAG_IPCHG;
-	if(IS_CONF(CF_MOD_IPCHG))       log_bitfield   |= FLAG_IPCHG;
+	if(IS_CONF(CF_MOD_IPCHG))       mod_bitfield   |= FLAG_IPCHG;
 
 	if(IS_CONF(CF_LOG_UNAUTH_RQ))   log_bitfield   |= FLAG_UNAUTH_RQ;
 	if(IS_CONF(CF_ALERT_UNAUTH_RQ)) alert_bitfield |= FLAG_UNAUTH_RQ;
-	if(IS_CONF(CF_MOD_UNAUTH_RQ))   log_bitfield   |= FLAG_UNAUTH_RQ;
+	if(IS_CONF(CF_MOD_UNAUTH_RQ))   mod_bitfield   |= FLAG_UNAUTH_RQ;
 
 	if(IS_CONF(CF_LOG_BOGON))       log_bitfield   |= FLAG_BOGON;
 	if(IS_CONF(CF_ALERT_BOGON))     alert_bitfield |= FLAG_BOGON;
-	if(IS_CONF(CF_MOD_BOGON))       log_bitfield   |= FLAG_BOGON;
+	if(IS_CONF(CF_MOD_BOGON))       mod_bitfield   |= FLAG_BOGON;
 
 	if(IS_CONF(CF_LOG_ABUS))        log_bitfield   |= FLAG_ABUS;
 	if(IS_CONF(CF_ALERT_ABUS))      alert_bitfield |= FLAG_ABUS;
-	if(IS_CONF(CF_MOD_ABUS))        log_bitfield   |= FLAG_ABUS;
+	if(IS_CONF(CF_MOD_ABUS))        mod_bitfield   |= FLAG_ABUS;
 
 	if(IS_CONF(CF_LOG_ALLOW))       log_bitfield   |= FLAG_ALLOW;
 	if(IS_CONF(CF_ALERT_ALLOW))     alert_bitfield |= FLAG_ALLOW;
-	if(IS_CONF(CF_MOD_ALLOW))       log_bitfield   |= FLAG_ALLOW;
+	if(IS_CONF(CF_MOD_ALLOW))       mod_bitfield   |= FLAG_ALLOW;
 
 	if(IS_CONF(CF_LOG_DENY))        log_bitfield   |= FLAG_DENY;
 	if(IS_CONF(CF_ALERT_DENY))      alert_bitfield |= FLAG_DENY;
-	if(IS_CONF(CF_MOD_DENY))        log_bitfield   |= FLAG_DENY;
+	if(IS_CONF(CF_MOD_DENY))        mod_bitfield   |= FLAG_DENY;
 
 	// if no device specified, auto select the first
 	if(config[CF_IF].valeur.string == NULL ||
@@ -501,7 +501,9 @@ void send_alert(struct ether_addr *mac_sender,
 	}
 
 	// get vendor
-	if(config[CF_LOG_VENDOR].valeur.integer == TRUE){
+	if(config[CF_LOG_VENDOR].valeur.integer |
+	   config[CF_ALERT_VENDOR].valeur.integer |
+	   config[CF_MOD_VENDOR].valeur.integer){
 		vendor = get_vendor(mac_sender);
 	}
 
