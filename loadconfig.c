@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 223 2006-10-05 19:44:46Z thierry $
+ * $Id: loadconfig.c 238 2006-10-06 11:07:14Z  $
  *
  */
 
@@ -214,7 +214,7 @@ void config_load(int argc, char *argv[]){
 	config[CF_ALERT_NEW].attrib = "alert on new address";
 	config[CF_ALERT_NEW].valeur.integer = TRUE;
 	config[CF_MOD_NEW].type = 2;
-	config[CF_MOD_NEW].attrib = "mod on new addres";
+	config[CF_MOD_NEW].attrib = "mod on new address";
 	config[CF_MOD_NEW].valeur.integer = TRUE;
 
 	config[CF_LOG_NEWMAC].type = 2;

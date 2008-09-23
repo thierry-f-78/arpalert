@@ -1,3 +1,6 @@
+1.1.1   * info<at>arpalert<dot>org
+          little bug in syntax of config file
+
 1.1.0   * info<at>arpalert<dot>org
           new function: permit to lesson only ARP traffic (alert new_mac disabled)
           new function: permit to call a .so extension
