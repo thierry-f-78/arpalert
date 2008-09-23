@@ -1,3 +1,10 @@
+#
+# Copyright (c) 2005-2010 Thierry FOURNIER
+# $Id: arpalert.conf.in 84 2006-05-09 06:27:15Z thierry $
+# 
+# Default config file
+# 
+
 # log level
 use syslog = true
 
@@ -31,13 +38,16 @@ daemon = false
 # 4: unauthorized arp request
 # 5: abusive number of arp request detected 
 # 6: ethernet mac address different from arp mac address
+# 7: global flood detection
+# 8: new mac adress without ip
+# 9: mac change
 Action on detect = ""
 
 # permit to ignore packets whith the lessons interface mac address
 Ignore me = true
 
 # script execution timeout (seconds)
-Execution timeout	= 10
+Execution timeout = 10
 
 # maximun simultaneous lanched script
 max alert = 20
@@ -72,9 +82,17 @@ alert on deny address = false
 log new address = true
 alert on new address = false
 
+# log if the adress isn't referenced (for mac adress only)
+log new mac address = true
+alert on new mac address = false
+
 # log if the ip adress id different from the last arp request with the same mac adress
 log ip change = true
 alert on ip change = false
+
+# log if the ip adress id different from the last arp request with the same mac adress
+log mac change = true
+alert on mac change = false
 
 # unauthorized arp request:
 # log all the request not authorized in auth file

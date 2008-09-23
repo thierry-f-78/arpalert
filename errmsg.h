@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: errmsg.h 60 2006-03-02 19:51:25Z thierry $
+ *
+ */
+
 const char *errmsg[] = {
 	"No error",
 	"Operation not permitted",

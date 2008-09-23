@@ -1,28 +1,33 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: sens.c 87 2006-05-09 07:58:27Z thierry $
+ *
+ */
+
 #include "config.h"
 
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "arpalert.h"
 #include "loadconfig.h"
 #include "data.h"
 #include "sens.h"
 #include "log.h"
 
-/* Taille de la table de hachage (nombre premier) */
-/* hash table size ; this number must be primary number */
+// hash table size ; this number must be primary number
 #define HASH_SIZE 1999
 
 /* debug: */
 // #define DEBUG 1
 
 /* HACHAGE */
-#define sens_hash(a, b, c) ( ( (u_char)(a->octet[4]) + (u_char)(a->octet[5]) + \
+#define sens_hash(a, b, c) ( ( ( (u_char)(a->octet[4]) << 8 ) + (u_char)(a->octet[5]) + \
                            (u_int32_t)(b.ip) + (u_int32_t)(c) ) % HASH_SIZE )
 
 #define BUF_SIZE 1024
@@ -109,7 +114,7 @@ void sens_init(void) {
 	// open config file
 	fd = open(config[CF_AUTHFILE].valeur.string, O_RDONLY);
 	if(fd == -1){
-		logmsg(LOG_ERR, "[%s %i] don't found authorization file %s",
+		logmsg(LOG_ERR, "[%s %i] didn't find authorization file %s",
 		       __FILE__, __LINE__, config[CF_AUTHFILE].valeur.string);
 		exit(1);
 	}
@@ -147,7 +152,7 @@ void sens_init(void) {
 						}
 						find++;
 					}
-					ip = data_toip(current);
+					ip = str_to_ip(current);
 
 					// network address validation
 					if( (ip & dec_to_bin[mask]) != ip){
@@ -175,7 +180,7 @@ void sens_init(void) {
 				}
 				if(cur_dec == 2){
 					current[current_count] = 0;
-					data_tohex(current, &last_mac);
+					str_to_mac(current, &last_mac);
 					current[0] = 0;
 					cur_dec = 0;
 				}
@@ -208,13 +213,13 @@ void sens_init(void) {
 				if(current_count == IP_ADRESS_MAX_LEN &&
 				   flag_mask == FALSE && *parse != '/'){
 					// syntax error
-					logmsg(LOG_ERR, "[%s %d] syntax error decodage IP at line %d",
+					logmsg(LOG_ERR, "[%s %d] syntax error decoding IP at line %d",
 					       __FILE__, __LINE__, line);
 					exit(1);
 				}
 				if(current_count == IP_ADRESS_MAX_LEN + MASK_MAX_LEN + 1 &&
 				   flag_mask == TRUE){
-					logmsg(LOG_ERR, "[%s %d] syntax error decodage IP at line %d",
+					logmsg(LOG_ERR, "[%s %d] syntax error decoding IP at line %d",
 					       __FILE__, __LINE__, line);
 					exit(1);
 				}
@@ -230,7 +235,7 @@ void sens_init(void) {
 			if(cur_dec == 2){
 				if(current_count == MAC_ADRESS_MAX_LEN){
 					//syntax error
-					logmsg(LOG_ERR, "[%s %d] syntax error decodage IP at line %d",
+					logmsg(LOG_ERR, "[%s %d] syntax error decoding IP at line %d",
 					       __FILE__, __LINE__, line);
 					exit(1);
 				}
@@ -264,10 +269,9 @@ void sens_init(void) {
 	}
 }
 
-/* data_add */
+// add data to hash
 void sens_add(data_mac *mac, data_ip ipb, u_int32_t mask){
 	u_int h;
-	struct pqt *spqt;
 	struct pqt *mpqt;
 
 	mpqt = (struct pqt *)malloc(sizeof(struct pqt));
@@ -276,41 +280,30 @@ void sens_add(data_mac *mac, data_ip ipb, u_int32_t mask){
 		       __FILE__, __LINE__);
 		exit(1);
 	}
-	mpqt->mac.octet[0] = mac->octet[0];
-	mpqt->mac.octet[1] = mac->octet[1];
-	mpqt->mac.octet[2] = mac->octet[2];
-	mpqt->mac.octet[3] = mac->octet[3];
-	mpqt->mac.octet[4] = mac->octet[4];
-	mpqt->mac.octet[5] = mac->octet[5];
+	data_cpy(&mpqt->mac, mac);
 	mpqt->ip_d = ipb;
 	mpqt->mask = mask;
-	mpqt->next = NULL;
 
-	// compute hash
+	// calculate hash
 	h = sens_hash(mac, ipb, mask);
-	spqt = (struct pqt *)pqt_h[h];
-
 	// find a free space
-	if(spqt==NULL){
-		pqt_h[h]=(struct pqt *)mpqt;
-	} else {
-		while(spqt->next != NULL) spqt=spqt->next;
-		spqt->next = mpqt;
-	}
+	mpqt->next = pqt_h[h];
+	pqt_h[h] = mpqt;
 }
 
 void sens_free(void){
 	int i;
-	struct pqt *mpqt;
-	struct pqt *spqt;
+	struct pqt *free_pqt;
+	struct pqt *current_pqt;
 
 	for(i=0; i<HASH_SIZE; i++){
-		spqt=pqt_h[i];
-		while(spqt != NULL){
-			mpqt=spqt;
-			spqt=spqt->next;
-			free(mpqt);
+		current_pqt = pqt_h[i];
+		while(current_pqt != NULL){
+			free_pqt = current_pqt;
+			current_pqt = current_pqt->next;
+			free(free_pqt);
 		}
+		pqt_h[i] = NULL;
 	}
 }
 
@@ -322,23 +315,27 @@ void sens_reload(void){
 int sens_exist(data_mac *mac, data_ip ipb){
 	u_int h;
 	struct pqt *spqt;
-	u_int32_t *masks;
+	u_int32_t *masks = &used_masks[0];
 	data_ip ip;
 
-	masks = &used_masks[0];
-		
+	// test all masks
 	while(*masks != END_OF_MASKS){
+		
+		// apply mask
 		ip.ip = ipb.ip & *masks;
-		h = sens_hash(mac, ip, (*masks));
-		spqt = (struct pqt *)pqt_h[h];
 
+		// get data in hash
+		h = sens_hash(mac, ip, (*masks));
+		spqt = pqt_h[h];
+
+		// find data
 		while(spqt != NULL){
 			if(spqt->ip_d.ip == ip.ip &&
 			   spqt->mask == *masks &&
-			   data_cmp(&spqt->mac, mac) == TRUE ){
+			   data_cmp(&spqt->mac, mac) == 0 ){
 				return(TRUE);
 			}
-			spqt=spqt->next;
+			spqt = spqt->next;
 		}
 		masks++;
 	}

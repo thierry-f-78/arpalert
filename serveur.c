@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: serveur.c 86 2006-05-09 07:43:38Z thierry $
+ *
+ */
+
 #include "config.h"
 
 #include <signal.h>
@@ -10,103 +16,138 @@
 #include <pwd.h>
 #include <sys/stat.h>
 
+#include "arpalert.h"
 #include "loadconfig.h"
 #include "log.h"
 
 void daemonize(void){
 	int pid;
-	int i;
+	int descriptor;
 	
 	pid = fork();
 	if(pid < 0){
 		logmsg(LOG_ERR, "[%s %i] I cant exec the first fork", __FILE__, __LINE__);
+		exit(1);
 	}
 	if(pid > 0){
 		exit(0);
 	}
 
-	setsid();
+	if( setsid() == -1 ){
+		logmsg(LOG_ERR, "[%s %i] error when apply setsid", __FILE__, __LINE__);
+		exit(1);
+	}
 
 	pid = fork();
 	if(pid < 0){
 		logmsg(LOG_ERR, "[%s %i] I cant exec the second fork", __FILE__, __LINE__);
+		exit(1);
 	}
 	if(pid > 0){
 		exit(0);
 	}
 
-	/* Ferme les descripteur de fichiers */
+	// close standard file descriptors
 	close(0);
 	close(1);
 	close(2);
 
-	/* ouvre les sortie standard (descripteurs 0 1 2) sur /dev/null */
-	i = open("/dev/null", O_RDWR);
-	if(i<0){
-		logmsg(LOG_ERR, "[%s %i] Can't open /dev/null\n", __FILE__, __LINE__);
+	// open standard descriptors on /dev/null
+	descriptor = open("/dev/null", O_RDWR);
+	if(descriptor < 0){
+		logmsg(LOG_ERR, "[%s %i] Can't open /dev/null", __FILE__, __LINE__);
+		exit(1);
 	}
-	dup(i);
-	dup(i);
+	if(dup(descriptor) == -1){
+		logmsg(LOG_ERR, "[%s %i] Can't duplicate file descriptor", __FILE__, __LINE__);
+		exit(1);
+	}
+	if(dup(descriptor) == -1){
+		logmsg(LOG_ERR, "[%s %i] Can't duplicate file descriptor", __FILE__, __LINE__);
+		exit(1);
+	}
 }
 
 void separe(void){
 	struct passwd *pwd = NULL;
 	uid_t uid = 0;
 	gid_t gid = 0;
-	char str[12];
+	char str[8]; // max process number = 9999999
 	int fd;
 
-	/* lock file */
+	// open lock/pid file
 	fd = open(config[CF_LOCKFILE].valeur.string, O_RDWR | O_CREAT, 0640);
 	if(fd < 0){
 		logmsg(LOG_ERR, "[%s %i] I can't create lock file: %s",
-			__FILE__, __LINE__, config[CF_LOCKFILE].valeur.string);
+		       __FILE__, __LINE__, config[CF_LOCKFILE].valeur.string);
 		exit(1);
 	}
+	
+	// lock file during program execution
 	if(lockf(fd, F_TLOCK, 0)<0){
 		logmsg(LOG_ERR, "[%s %i] daemon instance already running", __FILE__, __LINE__);
 		exit(1);
 	}
-	snprintf(str, 12, "%d\n", getpid());
+	
+	// write pid in lock file
+	snprintf(str, 8, "%d\n", getpid());
 	write(fd, str, strlen(str));
 
-	/* privilege separation */
+	// privilege separation
 	if(config[CF_USER].valeur.string[0] != 0) { 
-		if ((pwd = getpwnam(config[CF_USER].valeur.string)) == 0){
+
+		// get uid and gid by username 
+		pwd = getpwnam(config[CF_USER].valeur.string);
+		if (pwd == NULL){
 			logmsg(LOG_ERR, "[%s %i] unknown user: %s",
-				__FILE__, __LINE__, config[CF_USER].valeur.string);
+			       __FILE__, __LINE__, config[CF_USER].valeur.string);
 			exit(1);
 		}
-		if (setgid(gid) < 0){
-			logmsg(LOG_ERR, "[%s %i] setgid(%ld) error", __FILE__, __LINE__, (long) gid);
+		uid = pwd->pw_uid;
+		gid = pwd->pw_gid;
+
+		// set default group of user
+		if (setgid(gid) == -1){
+			logmsg(LOG_ERR, "[%s %i] setgid(%ld) error", __FILE__, __LINE__, (long)gid);
 			exit(1);
-		}  
-		if (initgroups(config[CF_USER].valeur.string, gid) < 0){
+		}
+
+		// use all groups assigned to user
+		if (initgroups(config[CF_USER].valeur.string, gid) == -1){
 			logmsg(LOG_ERR, "[%s %i] initgroups error", __FILE__, __LINE__);
 			exit(1);
 		}
+
+		// close passwd and groups
+		endpwent();
+		endgrent();
 	}
 
-	/* chroot */
+	// chrooting
 	if (config[CF_CHROOT].valeur.string[0] != 0) {
+			  
+		// chrooting
 		if (chroot(config[CF_CHROOT].valeur.string)){
 			logmsg(LOG_ERR, "[%s %i] Problem with chroot", __FILE__, __LINE__);
 			exit(1);
 		}
+
+		// change current directory
 		if (chdir("/")){
 			logmsg(LOG_ERR, "[%s %i] Problem with chdir", __FILE__, __LINE__);
 			exit(1);
 		}
-	}	
-	/* change user */
+	}
+
+	// change user
 	if(config[CF_USER].valeur.string[0] != 0) {
-		if (setuid(uid) < 0){
-			logmsg(LOG_ERR, "[%s %i] setuid(%ld) error", __FILE__, __LINE__, (long) uid);
+		if (setuid(uid) == -1){
+			logmsg(LOG_ERR, "[%s %i] setuid(%ld) error", __FILE__, __LINE__, (long)uid);
 			exit(1);
 		}
 	}
 
-	/* write rights */
+	// create file rights
 	umask(config[CF_UMASK].valeur.integer);
 }
 

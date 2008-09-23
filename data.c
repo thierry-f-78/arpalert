@@ -1,22 +1,29 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: data.c 89 2006-05-09 15:31:10Z thierry $
+ *
+ */
+
 #include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
+#include "arpalert.h"
 #include "data.h"
 #include "log.h"
 #include "loadconfig.h"
 
 // hash table size (must be a primary number)
 #define HASH_SIZE 1999
-#define HASH_B 256
-
-// conversion bin -> hexa 
-const char conv[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
 // conversion hexa -> bin
-const u_char vnoc[103] = {
+const u_char hex_conv[103] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /*  9 */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 19 */
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,    /* 29 */
@@ -30,73 +37,78 @@ const u_char vnoc[103] = {
 	13,14,15                         /* 102 */
 };
 
+// actual number of datas
 unsigned int data_size;
 
-unsigned int data_hash(data_mac *mac);
-unsigned int data_cmp(data_mac *mac1, data_mac *mac2);
+//unsigned int data_mac_hash(data_mac *mac);
+#define DATA_MAC_HASH(a) ( ( ( (u_char)(a->octet[4]) << 8 )  + \
+                           (u_char)(a->octet[5]) ) % HASH_SIZE )
 
-/* unite de la table */
-typedef struct __data_element {
+//unsigned int data_ip_hash(data_mac *mac);
+#define DATA_IP_HASH(a) ( (u_int32_t)a % HASH_SIZE )
+
+// hash table cell
+struct data_element {
 	data_pack data;
-	struct __data_element *next;
-} data_element;
+	struct data_element *next_mac;
+	struct data_element *next_ip;
+};
 
-/* pointeur sur unit� */
-typedef data_element * p_data_element;
+// hash mac table base
+struct data_element *data_mac_tab[HASH_SIZE];
 
-/* Tableau d'adresses mac */
-p_data_element *data_tab;
+// hash ip table base
+struct data_element *data_ip_tab[HASH_SIZE];
 
-/* initialise la memoire */
+// dump mask
+int dump_mask;
+
+// init memory
 void data_init(void){
-	p_data_element *init_null;
-
-	/* reserve le tableau de pointeurs de la taille du hash */
-	data_tab = (p_data_element *)malloc(HASH_SIZE * sizeof(p_data_element));
-
-	/* met tous ses element a NULL */
-	init_null = data_tab;
-	while(init_null < data_tab + HASH_SIZE){
-		*init_null = NULL;
-		init_null++;
-	}
-
+	memset(data_mac_tab, 0, HASH_SIZE * sizeof(struct data_element *));
+	memset(data_ip_tab, 0, HASH_SIZE * sizeof(struct data_element *));
 	data_size = 0;
+
+	// compute mask of allowed data dump
+	dump_mask =	config[CF_DMPBL].valeur.integer * DENY +
+	            config[CF_DMPWL].valeur.integer * ALLOW +
+	            config[CF_DMPAPP].valeur.integer * APPEND;
 }
 
-/* libere la memoire */
+// free memory
 void data_reset(void){
-	p_data_element *init_null;
-	data_element *del, *delnext;
-	init_null = data_tab;
-	while(init_null < data_tab + HASH_SIZE){
-		del = *init_null;
-		while(1){
-			if(del != NULL){
-				delnext = (*del).next;
-				free(del);
-				del = delnext;
-			} else {
-				break;
-			}
-	}
-		*init_null = NULL;
-		init_null++;
+	struct data_element *del;
+	struct data_element *delnext;
+	int step;
+
+	for(step=0; step<HASH_SIZE; step++){
+		delnext = data_mac_tab[step];
+		while(delnext != NULL){
+			del = delnext;
+			delnext = delnext->next_mac;
+			free(del);
+		}
+		data_mac_tab[step] = NULL;
+		data_ip_tab[step] = NULL;
 	}
 }
 
-/* libere la memoire */
-void data_close(void){
-	data_reset();
-	free(data_tab);
+// add mac address in hash
+void data_add_field(data_mac *mac, int status,  int ip, u_int32_t field){
+	data_pack *datap;
+	
+	datap = data_add(mac, status, ip);
+	datap->alerts = field;
 }
 
-/* ajoute une @ mac a la table */
-void data_add(data_mac *mac, int status,  int ip){
-	p_data_element *add;
-	data_element *libre;
+// add mac address in hash
+data_pack *data_add(data_mac *mac, int status,  int ip){
+	struct data_element *add;
+	struct data_element *libre;
+	int mac_hash;
+	int ip_hash;
 	#ifdef DEBUG 
-	unsigned char buf[18];
+	char buf[18];
 	#endif
 
 	if(data_size >= config[CF_MAXENTRY].valeur.integer){
@@ -105,233 +117,225 @@ void data_add(data_mac *mac, int status,  int ip){
 		data_clean(0);
 	}
 	
-	/* possitionement de la nouvelle donn� en memoire */
-	add = data_tab;
-	add += data_hash(mac);
+	// allocate memory for new data
+	libre = (struct data_element *)malloc(sizeof(struct data_element));
 
-	/* recherche d'un emplacement libre */
-	if(*add != NULL){
-		libre = *add;
-		while((*libre).next!= NULL){
-			libre = (*libre).next;
-		}
-		add = &((*libre).next);
+	if(libre == NULL){
+		logmsg(LOG_ERR, "[%s %i] Memory allocation error", __FILE__, __LINE__);
+		exit(1);
 	}
 
-	/* creation et malloc d'un nouveau data_element (nouvelle mac) dans add */
-	libre = (data_element *)malloc(sizeof(data_element));
+	// make data structur
+	data_cpy(&libre->data.mac, mac);
+	libre->data.flag = status;
+	libre->data.ip.ip = ip;
+	libre->data.timestamp = current_time;
+	libre->data.lastalert[0] = 0;
+	libre->data.lastalert[1] = 0;
+	libre->data.lastalert[2] = 0;
+	libre->data.lastalert[3] = 0;
+	libre->data.lastalert[4] = 0;
+	libre->data.lastalert[5] = 0;
+	libre->data.lastalert[6] = 0;
+	libre->data.request = 0;
+	libre->data.alerts = 0;
+	data_size++;
 
-	if(libre ==NULL){
-		logmsg(LOG_ERR, "[%s %i] Memory allocation error", __FILE__, __LINE__);
+	// calculate mac hash
+	mac_hash = DATA_MAC_HASH(mac);
+	add = data_mac_tab[mac_hash];
+
+	// find free space
+	libre->next_mac = data_mac_tab[mac_hash];
+	data_mac_tab[mac_hash] = libre;
+	
+	// index ip
+	if(ip != 0 && data_ip_exist(ip) == NULL ){
+			
+		// calculate ip hash
+		ip_hash = DATA_IP_HASH(ip);
+		// find free space in ip hash
+		libre->next_ip = data_ip_tab[ip_hash];
+		data_ip_tab[ip_hash] = libre;
+
 	} else {
-		(*libre).data.mac.octet[0] = (*mac).octet[0];
-		(*libre).data.mac.octet[1] = (*mac).octet[1];
-		(*libre).data.mac.octet[2] = (*mac).octet[2];
-		(*libre).data.mac.octet[3] = (*mac).octet[3];
-		(*libre).data.mac.octet[4] = (*mac).octet[4];
-		(*libre).data.mac.octet[5] = (*mac).octet[5];
-		(*libre).data.flag = status;
-		(*libre).data.ip.ip = ip;
-		(*libre).data.timestamp = time(NULL);
-		(*libre).data.lastalert[0] = 0;
-		(*libre).data.lastalert[1] = 0;
-		(*libre).data.lastalert[2] = 0;
-		(*libre).data.lastalert[3] = 0;
-		(*libre).data.lastalert[4] = 0;
-		(*libre).data.lastalert[5] = 0;
-		(*libre).data.lastalert[6] = 0;
-		(*libre).data.request = 0;
-		(*libre).next = NULL;
-		*add = libre;
-		#ifdef DEBUG
-			data_tomac(*mac, buf);
-			logmsg(LOG_DEBUG, "[%s %i] Address %s add in memory at 0x%x",
-				__FILE__, __LINE__, buf, (unsigned int)add);
-		#endif
-		data_size++;
+		libre->next_ip = NULL;
+	}
+	
+	#ifdef DEBUG
+	MAC_TO_STR(mac[0], buf);
+	logmsg(LOG_DEBUG, "[%s %i] Address %s add in hash",
+	       __FILE__, __LINE__, buf);
+	#endif
+
+	return(&libre->data);
+}
+
+// add ip in index
+void index_ip(data_pack *to_index){
+	data_mac *mac;
+	struct data_element *find;
+	int hash;
+
+	mac = &to_index->mac;
+	hash = DATA_MAC_HASH(mac);
+	find = data_mac_tab[hash];
+
+	while(&find->data != to_index){
+		find = find->next_mac;
+	}
+
+	// calculate ip hash
+	hash = DATA_IP_HASH(to_index->ip.ip);
+	// add data
+	find->next_ip = data_ip_tab[hash];
+	data_ip_tab[hash] = find;
+}
+
+// delete indexed ip
+void unindex_ip(u_int32_t ip){
+	struct data_element *previous;
+	struct data_element *find;
+	int hash;
+		  
+	// calculate ip hash
+	hash = DATA_IP_HASH(ip);
+	find = data_ip_tab[hash];
+
+	// find entry
+	previous = (struct data_element *)&data_ip_tab[hash];
+	while(find != NULL && find->data.ip.ip != ip) {
+		previous = (struct data_element *)&find->next_ip;
+		find = find->next_ip;
+	}
+
+	// delete hash entry
+	if(find != NULL){
+		previous = find->next_ip;
+		find->next_ip = NULL;
 	}
 }
 
-/* dump du hash */
+// dump hash data
 void data_dump(void){
-	p_data_element *init_null;
-	data_element *del;
-	char s_mac[18];
-	FILE *fp;
-	char msg[128];
-	
-	if(config[CF_LEASES].valeur.string[0] != 0){
-		fp = fopen(config[CF_LEASES].valeur.string, "w");
-		if(fp == NULL){
-			logmsg(LOG_ERR, "[%s %i] Can't open file [%s]", __FILE__, __LINE__, 
-				config[CF_LEASES].valeur.string);
-			exit(1);
-		}
-	} else {
+	struct data_element *dump;
+	int step;
+	int fp;
+	int len;
+	char msg[35]; //mac(17) + ip(15) + spc + \n + \0
+
+	// if no data dump file
+	if(config[CF_LEASES].valeur.string[0] == 0) {
 		return;
 	}
 	
-	init_null = data_tab;
-	while(init_null < data_tab + HASH_SIZE){
-		del = *init_null;
-		while(1){
-			if(del != NULL){
-				data_tomac((*del).data.mac, s_mac);
-				if(
-					(
-					 	config[CF_DMPBL].valeur.integer == TRUE 
-						&& del[0].data.flag == DENY
-					) || (
-						config[CF_DMPWL].valeur.integer == TRUE 
-						&& del[0].data.flag == ALLOW
-					) || (
-						config[CF_DMPAPP].valeur.integer == TRUE 
-						&& del[0].data.flag == APPEND
-					)
-				){
-					if(del[0].data.ip.ip != 0){
-						snprintf(msg, 128, "%s %i.%i.%i.%i\n", s_mac, 
-							del[0].data.ip.bytes[3], del[0].data.ip.bytes[2], 
-							del[0].data.ip.bytes[1], del[0].data.ip.bytes[0]);
-						fputs(msg, fp);
-					}
-				}
-				del = (*del).next;
-			} else {
-				break;
-			}
-		}
-		init_null++;
+	// open file
+	fp = open(config[CF_LEASES].valeur.string, O_WRONLY | O_CREAT | O_TRUNC, 
+	          S_IRWXO | S_IRWXG | S_IRWXU);
+
+	// error check
+	if(fp == -1){
+		logmsg(LOG_ERR, "[%s %i] Can't open file [%s]", __FILE__, __LINE__, 
+		       config[CF_LEASES].valeur.string);
+		exit(1);
 	}
-	fclose(fp);
+
+	// parse hash table
+	for(step=0; step<HASH_SIZE; step++){
+		dump = data_mac_tab[step];
+		while(dump != NULL){
+			// dump
+			if( ( dump_mask & dump->data.flag) != 0 ){
+				if(dump->data.ip.ip != 0){
+					len = sprintf(msg, "%02x:%02x:%02x:%02x:%02x:%02x %i.%i.%i.%i\n",
+					              dump->data.mac.octet[0], dump->data.mac.octet[1],
+					              dump->data.mac.octet[2], dump->data.mac.octet[3],
+					              dump->data.mac.octet[4], dump->data.mac.octet[5], 
+					              dump->data.ip.bytes[3], dump->data.ip.bytes[2], 
+					              dump->data.ip.bytes[1], dump->data.ip.bytes[0]);
+					write(fp, msg, len);
+				}
+			}
+
+			// get next data
+			dump = dump->next_mac;
+		}
+	}
+
+	// close file
+	if(close(fp) == -1){
+		logmsg(LOG_ERR, "[%s %i] Can't close file [%s]", __FILE__, __LINE__, 
+		       config[CF_LEASES].valeur.string);
+		exit(1);
+	}
 }
 
-/* netoyage des anciens */
+// clean old detected mac adresses
 void data_clean(int timeout){
-	p_data_element *init_null;
-	data_element *actu;
-	data_element *last;
-	data_element *next;
+	struct data_element *clean;
+	struct data_element *next;
+	int step;
 	
-	init_null = data_tab;
-	while(init_null < data_tab + HASH_SIZE){
-		actu = *init_null;
-		last = (data_element *)init_null;
-		while(1){
-			if(actu != NULL){
-				next = (*actu).next;
-				if((*actu).data.flag == APPEND &&
-				   ( time(NULL) - (*actu).data.timestamp ) >= timeout){
-					if(last==(data_element *)init_null){
-						*init_null = next;
-					}else{
-						(*last).next = next;
-					}
-					free(actu);
-					data_size--;
-					flagdump = TRUE;
-				} else {
-					last = actu;
-				}
-				actu = next;
+	// parse hash table
+	for(step=0; step<HASH_SIZE; step++){
+		clean = data_mac_tab[step];
+		while(clean != NULL){
+				
+			if(
+			   clean->data.flag == APPEND &&
+			   ( current_time - clean->data.timestamp ) >= timeout
+			){
+				next = clean->next_mac;
+				free(clean);
+				clean = next;
+				data_size--;
+				flagdump = TRUE;
 			} else {
-				break;
+				// get next data
+				clean = clean->next_mac;
 			}
 		}
-		init_null++;
 	}
 }
 
+// get ip in ip hash
+data_pack *data_ip_exist(u_int32_t ip){
+	struct data_element *find;
+	int hash;
 
-			
-/* cherche si @ mac existe */
-data_pack *data_exist(data_mac *mac){
-	data_element *question;
-	p_data_element *emplacement;
+	// calculate hash
+	hash = DATA_IP_HASH(ip);
+	find = data_ip_tab[hash];
 
-	/* va chercher le segement dans la table de hachage */
-	emplacement = data_tab;
-	emplacement += data_hash(mac);
-	question = *emplacement;
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Test address (%02x:%02x:%02x:%02x:%02x:%02x) hash=0x%x -> data=0x%x",
-               __FILE__, __LINE__, 
-					mac->octet[0], mac->octet[1], mac->octet[2], mac->octet[3], mac->octet[4], mac->octet[5], 
-					(unsigned int)emplacement, (unsigned int)question);
-	#endif
-	if(question == NULL)return(NULL);
-
-	while(data_cmp(&(question->data.mac), mac) == FALSE){
-		if(question->next != NULL){
-			question = question->next;
-		} else {
-			return(NULL);
+	while(find != NULL){
+		if(find->data.ip.ip == ip){
+			return( &find->data );
 		}
+		find = find->next_ip;
 	}
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Address founded", __FILE__, __LINE__);
-	#endif
-	return(&(question->data));
+	return(NULL);
 }
 
-/* fait le hachage */
-unsigned int data_hash(data_mac *mac){
-	unsigned int v = 0;
-	unsigned int i = 0;
+// get mac in hash
+data_pack *data_exist(data_mac *mac){
+	struct data_element *find;
+	int hash;
 
-	i = 4;
-	while(i<6){
-		v = (v * HASH_B + mac->octet[i]) % HASH_SIZE;
-		i++;
+	// calculate hash
+	hash = DATA_MAC_HASH(mac);
+	find = data_mac_tab[hash];
+
+	while(find != NULL){
+		if(data_cmp(&find->data.mac, mac) == 0){
+			return( &find->data );
+		}
+		find = find->next_mac;
 	}
-	return(v);
+	return(NULL);
 }
 
-u_int data_cmp(data_mac *mac1, data_mac *mac2){
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Compare %08x <=> %08x",
-          __FILE__, __LINE__, mac1, mac2);
-	logmsg(LOG_DEBUG, "[%s %i] Compare %02x:%02x:%02x:%02x:%02x:%02x <=> %02x:%02x:%02x:%02x:%02x:%02x",
-          __FILE__, __LINE__, 
-          mac1->octet[0], mac1->octet[1], mac1->octet[2], mac1->octet[3], mac1->octet[4], mac1->octet[5],
-          mac2->octet[0], mac2->octet[1], mac2->octet[2], mac2->octet[3], mac2->octet[4], mac2->octet[5]);
-	#endif
-	if(mac1->octet[0] != mac2->octet[0]) return(FALSE);
-	if(mac1->octet[1] != mac2->octet[1]) return(FALSE);
-	if(mac1->octet[2] != mac2->octet[2]) return(FALSE);
-	if(mac1->octet[3] != mac2->octet[3]) return(FALSE);
-	if(mac1->octet[4] != mac2->octet[4]) return(FALSE);
-	if(mac1->octet[5] != mac2->octet[5]) return(FALSE);
-	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Return TRUE", __FILE__, __LINE__);
-	#endif
-	return(TRUE);
-}
-
-/* conversion du type mac vers un string lisible */
-void data_tomac(data_mac bin, char *buf){
-	buf[0]=conv[bin.octet[0]>>4];
-	buf[1]=conv[bin.octet[0]&0x0f];
-	buf[2]=':';
-	buf[3]=conv[bin.octet[1]>>4];
-	buf[4]=conv[bin.octet[1]&0x0f];
-	buf[5]=':';
-	buf[6]=conv[bin.octet[2]>>4];
-	buf[7]=conv[bin.octet[2]&0x0f];
-	buf[8]=':';
-	buf[9]=conv[bin.octet[3]>>4];
-	buf[10]=conv[bin.octet[3]&0x0f];
-	buf[11]=':';
-	buf[12]=conv[bin.octet[4]>>4];
-	buf[13]=conv[bin.octet[4]&0x0f];
-	buf[14]=':';
-	buf[15]=conv[bin.octet[5]>>4];
-	buf[16]=conv[bin.octet[5]&0x0f];
-	buf[17]=0;
-}
-
-// conversion string ip to u_int32_t
-u_int32_t data_toip(char *ip){
+// translate string ip to u_int32_t
+u_int32_t str_to_ip(char *ip){
 	char *parse;
 	char *begin;
 	u_int conv;
@@ -383,8 +387,8 @@ u_int32_t data_toip(char *ip){
 	return ip_32.ip;
 }
 
-/* conversion d'un string lisible (table arp du noyaux, ...) vers un type mac */
-void data_tohex(char *macaddr, data_mac *to_mac){
+// translate string mac to binary mac
+void str_to_mac(char *macaddr, data_mac *to_mac){
 	int i;
 	
 	// format verification
@@ -416,17 +420,17 @@ void data_tohex(char *macaddr, data_mac *to_mac){
 		}
 	}
 
-	to_mac->octet[0] =  vnoc[(u_char)macaddr[1]];
-	to_mac->octet[0] += vnoc[(u_char)macaddr[0]] * 16;
-	to_mac->octet[1] =  vnoc[(u_char)macaddr[4]];
-	to_mac->octet[1] += vnoc[(u_char)macaddr[3]] * 16;
-	to_mac->octet[2] =  vnoc[(u_char)macaddr[7]];
-	to_mac->octet[2] += vnoc[(u_char)macaddr[6]] * 16;
-	to_mac->octet[3] =  vnoc[(u_char)macaddr[10]];
-	to_mac->octet[3] += vnoc[(u_char)macaddr[9]] * 16;
-	to_mac->octet[4] =  vnoc[(u_char)macaddr[13]];
-	to_mac->octet[4] += vnoc[(u_char)macaddr[12]] * 16;
-	to_mac->octet[5] =  vnoc[(u_char)macaddr[16]];
-	to_mac->octet[5] += vnoc[(u_char)macaddr[15]] * 16;
+	to_mac->octet[0] =  hex_conv[(u_char)macaddr[1]];
+	to_mac->octet[0] += hex_conv[(u_char)macaddr[0]] * 16;
+	to_mac->octet[1] =  hex_conv[(u_char)macaddr[4]];
+	to_mac->octet[1] += hex_conv[(u_char)macaddr[3]] * 16;
+	to_mac->octet[2] =  hex_conv[(u_char)macaddr[7]];
+	to_mac->octet[2] += hex_conv[(u_char)macaddr[6]] * 16;
+	to_mac->octet[3] =  hex_conv[(u_char)macaddr[10]];
+	to_mac->octet[3] += hex_conv[(u_char)macaddr[9]] * 16;
+	to_mac->octet[4] =  hex_conv[(u_char)macaddr[13]];
+	to_mac->octet[4] += hex_conv[(u_char)macaddr[12]] * 16;
+	to_mac->octet[5] =  hex_conv[(u_char)macaddr[16]];
+	to_mac->octet[5] += hex_conv[(u_char)macaddr[15]] * 16;
 }
 

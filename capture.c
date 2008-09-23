@@ -1,6 +1,13 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: capture.c 89 2006-05-09 15:31:10Z thierry $
+ *
+ */
+
+#include "config.h"
+
 #include <pcap.h>
 #include <stdlib.h>
-#include <time.h>
 #include <fcntl.h>
 #include <string.h>
 #include <pwd.h>
@@ -24,12 +31,12 @@
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
+#include "arpalert.h"
 #include "capture.h"
 #include "sens.h"
 #include "log.h"
 #include "loadconfig.h"
 #include "data.h"
-#include "config.h"
 #include "alerte.h"
 #include "sens_timeouts.h"
 
@@ -39,8 +46,16 @@
 #define FILTER "arp or rarp"
 #define FILTER "arp or ether src ff:ff:ff:ff:ff:ff"
 */
-#define FILTER ""
+#define FILTER_BASE ""
+#define FILTER_EXCLUDE "not ether host "
 
+// constantes
+//const char mac_empty[]  = "00:00:00:00:00:00";
+const data_mac null_mac = { { 0, 0, 0, 0, 0, 0 } };
+//const char ip_empty[] = "0.0.0.0";
+const data_ip broadcast = { 0xffffffff };
+
+// persistent var
 int seq = 0;
 int abus = 50;
 int base = 21;
@@ -54,8 +69,7 @@ void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 void cap_init(void){
 	char err[PCAP_ERRBUF_SIZE];
 	char *device;
-	char ethernet[18];
-	char filtre[1024];
+	char filtre[1024] = FILTER_BASE;
 	struct bpf_program bp;
 	int promisc;
 
@@ -92,8 +106,6 @@ void cap_init(void){
 	}
 
 	// find my arp adresses for this device
-	strncpy(filtre, FILTER, 1024);
-
 	if(config[CF_IGNORE_ME].valeur.integer == TRUE){
 		#if defined(__linux__)
 		if((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){
@@ -106,12 +118,7 @@ void cap_init(void){
 			logmsg(LOG_ERR, "[%s %i] Error in ioctl call", __FILE__, __LINE__);
 			exit(1);
 		}
-		me.octet[0] = ifr.ifr_addr.sa_data[0];
-		me.octet[1] = ifr.ifr_addr.sa_data[1];
-		me.octet[2] = ifr.ifr_addr.sa_data[2];
-		me.octet[3] = ifr.ifr_addr.sa_data[3];
-		me.octet[4] = ifr.ifr_addr.sa_data[4];
-		me.octet[5] = ifr.ifr_addr.sa_data[5];
+		data_cpy(&me, &ifr.ifr_addr.sa_data);
 		#endif
 
 		#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
@@ -139,18 +146,12 @@ void cap_init(void){
 		ifm = (struct if_msghdr *)buf;
 		sdl = (struct sockaddr_dl *)(ifm + 1);
 		ptr = (unsigned char *)LLADDR(sdl);
-		me.octet[0] = *ptr;
-		me.octet[1] = *(ptr+1);
-		me.octet[2] = *(ptr+2);
-		me.octet[3] = *(ptr+3);
-		me.octet[4] = *(ptr+4);
-		me.octet[5] = *(ptr+5);
+		data_cpy(&me, ptr);
 		free(buf);
 		#endif
 
-		data_tomac(me, ethernet);
-		strncat(filtre, " not ether host ", 1024);
-		strncat(filtre, ethernet, 1024);
+		strcat(filtre, FILTER_EXCLUDE);
+		MAC_TO_STR(me, &filtre[strlen(filtre)]);
 	}
 	
 	// promiscuous mode ?
@@ -162,18 +163,21 @@ void cap_init(void){
 	
 	// interface initialization 
 	if((idcap = pcap_open_live(device, SNAP_LEN, promisc, 0, err)) == NULL){
-		logmsg(LOG_ERR, "[%s %i] pcap_open_live error: %s", __FILE__, __LINE__, err);
+		logmsg(LOG_ERR, "[%s %i] pcap_open_live error: %s",
+		       __FILE__, __LINE__, err);
 		exit(1);
 	}
 
 	if(pcap_datalink(idcap) != DLT_EN10MB){
-		logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: unrecognied link", __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: unrecognized link",
+		       __FILE__, __LINE__);
 		exit(1);
 	}
 	
 	/* initilise le filtre: */
 	if(pcap_compile(idcap, &bp, filtre, 0x100, /*maskp*/ 0) < 0){
-		logmsg(LOG_ERR, "[%s %i] pcap_compile error: %s", __FILE__, __LINE__, pcap_geterr(idcap));
+		logmsg(LOG_ERR, "[%s %i] pcap_compile error: %s",
+		       __FILE__, __LINE__, pcap_geterr(idcap));
 		exit(1);
 	}
 
@@ -184,7 +188,8 @@ void cap_init(void){
 		exit(1);
 	}
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] pcap_setfilter [%s]: ok", __FILE__, __LINE__, FILTER);
+	logmsg(LOG_DEBUG, "[%s %i] pcap_setfilter [%s]: ok",
+	       __FILE__, __LINE__, filtre);
 	#endif
 }
 
@@ -198,44 +203,74 @@ void cap_sniff(void){
 	exit(1);
 }
 
+// convert eth mac source to string
+#define STR_ETH_MAC_SENDER if(flag_str_eth_mac_sender == FALSE){ \
+                           	MAC_TO_STR(eth_mac_sender[0], str_eth_mac_sender); \
+                           	flag_str_eth_mac_sender = TRUE; \
+                           }
+
+// convert mac into sting
+#define STR_ARP_MAC_SENDER if(flag_str_arp_mac_sender == FALSE){ \
+                           	MAC_TO_STR(arp_mac_sender[0], str_arp_mac_sender); \
+                           	flag_str_arp_mac_sender = TRUE;	\
+                           }	
+
+// convert ip into string
+#define ARP_IP_SENDER if(flag_str_arp_ip_sender == FALSE){ \
+                      	IP_TO_STR(arp_ip_sender, str_arp_ip_sender); \
+                      	flag_str_arp_ip_sender = TRUE; \
+                      }
+
+// convert ip into string
+#define ARP_IP_RCPT if(flag_str_arp_ip_rcpt == FALSE){ \
+                    	IP_TO_STR(arp_ip_rcpt, str_arp_ip_rcpt); \
+                    	flag_str_arp_ip_rcpt = TRUE; \
+                    }
+
 void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
-	/*
-	unsigned char smacs[18];
-	unsigned char smacseth[18];
-	unsigned char ip[16];
-	unsigned char iq[16];
-	unsigned char ip_tmp[16];
-	*/
-	char smacs[18];
-	char smacseth[18];
-	char ip[16];
-	char iq[16];
+	char m_eth_mac_sender[18];
+	char m_arp_mac_sender[18];
+	char m_arp_ip_sender[16];
+	char m_arp_ip_rcpt[16];
+
+	int flag_is_arp = FALSE;
+	data_mac *eth_mac_sender = (data_mac *)&null_mac;
+	data_mac *arp_mac_sender = (data_mac *)&null_mac;
+	data_ip arp_ip_sender = { 0x00000000 };
+	data_ip arp_ip_rcpt   = { 0x00000000 };
+	data_pack *eth_data = NULL;
+	data_pack *ip_data = NULL;
+	char *str_eth_mac_sender = m_eth_mac_sender;
+	char *str_arp_mac_sender = m_arp_mac_sender;
+	char *str_arp_ip_sender = m_arp_ip_sender;
+	char *str_arp_ip_rcpt   = m_arp_ip_rcpt;
+	int flag_str_eth_mac_sender = FALSE;
+	int flag_str_arp_mac_sender = FALSE;
+	int flag_str_arp_ip_sender = FALSE; 
+	int flag_str_arp_ip_rcpt = FALSE;
+	int flag_unknown_address = TRUE;
+
 	char ip_tmp[16];
-	data_pack *data;
-	data_pack *dataeth;
-	data_mac macs;
-	data_mac maceth;
-	data_ip ip_32;
-	data_ip ip_33;
-	data_ip broadcast;
-	int ret, flag;
+	char mac_tmp[18];
 	int timeact;
 	int i;
 
-	broadcast.bytes[0] = 255;
-	broadcast.bytes[1] = 255;
-	broadcast.bytes[2] = 255;
-	broadcast.bytes[3] = 255;
-	smacs[0]=0;
-	smacseth[0]=0;
-	strcpy((char *)&ip, "0.0.0.0");
-	strcpy((char *)&iq, "0.0.0.0");
-	ip_32.ip=0;
-	ip_33.ip=0;
-	timeact=time(NULL);
+	// if dump paquet is active
+	if(config[CF_DUMP_PAQUET].valeur.integer == TRUE){
+		for(i=0; i<53; i++){
+			if(i%6==0){
+				printf("\n%2d: ", i);
+			}
+			printf("%02x ", buff[i]);
+		}
+		printf("\n");
+	}
+
+	// get the time
+	timeact = h->ts.tv_sec;
 	
-	if(count > config[CF_ANTIFLOOD_GLOBAL].valeur.integer \
-		&& timeact - count_t < config[CF_ANTIFLOOD_INTER].valeur.integer) {
+	if(count > config[CF_ANTIFLOOD_GLOBAL].valeur.integer &&
+	   timeact - count_t < config[CF_ANTIFLOOD_INTER].valeur.integer) {
 		return;
 	}
 	
@@ -243,345 +278,509 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	logmsg(LOG_DEBUG, "[%s %i] Capture packet", __FILE__, __LINE__);
 	#endif
 
-	if(config[CF_DUMP_PAQUET].valeur.integer == TRUE){
-		for(i=0; i<53; i++){
-			if(i%6==0) printf("\n%2d: ", i);
-			 printf("%02x ", buff[i]);
-		}
-		printf("\n");
-	}
-
-	/* get a ethernet mac source */
-	maceth.octet[0] = buff[6];
-	maceth.octet[1] = buff[7];
-	maceth.octet[2] = buff[8];
-	maceth.octet[3] = buff[9];
-	maceth.octet[4] = buff[10];
-	maceth.octet[5] = buff[11];
-
-	dataeth = data_exist(&maceth);
-	data_tomac(maceth, smacseth);
-
+	//increment sequence
 	seq++;
 
-	/* is an arp who-has ? */
+	// get a ethernet mac source
+	eth_mac_sender = (data_mac *)&buff[6];
+
+	// get properties memorised of this mac
+	eth_data = data_exist(eth_mac_sender);
+
+	if(eth_data != NULL) {
+		flag_unknown_address = FALSE;
+	}
+
+	// is an arp who-has ?
 	if(buff[base + 0] == 1 && buff[12] == 8 && buff[13] == 6) {
 	
-		/* general flood detection */
+		// set flag "is arp"
+		flag_is_arp = TRUE;
+		
+		// get arp mac sender
+		arp_mac_sender = (data_mac *)&buff[base + 1];
+
+		// get ip arp sender
+		arp_ip_sender.bytes[3] = buff[base + 7];
+		arp_ip_sender.bytes[2] = buff[base + 8];
+		arp_ip_sender.bytes[1] = buff[base + 9];
+		arp_ip_sender.bytes[0] = buff[base + 10];
+		
+		// get ip arp rcpt
+		arp_ip_rcpt.bytes[3] = buff[base + 17];
+		arp_ip_rcpt.bytes[2] = buff[base + 18];
+		arp_ip_rcpt.bytes[1] = buff[base + 19];
+		arp_ip_rcpt.bytes[0] = buff[base + 20];
+
+		// count number of request in 1 second
 		if(count_t == timeact){
 			count ++;
-			#ifdef DEBUG
-			logmsg(LOG_DEBUG, "count=%d", count);
-			#endif
 		} else {
 			count = 1;
 			count_t = timeact;
 		}
-		if(count > config[CF_ANTIFLOOD_GLOBAL].valeur.integer) {
-			if(config[CF_LOG_FLOOD].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=flood",
-				       seq, smacs, ip, iq);
-			}
-			if(config[CF_ALERT_ON_FLOOD].valeur.integer == TRUE){
-				ret = alerte(smacs, ip, iq, 7);
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-						__FILE__, __LINE__, ret);
-				}
-				#endif
-			}
-			return;
-		}
-		
-		/* mac du poseur de question */
-		macs.octet[0] = buff[base + 1];
-		macs.octet[1] = buff[base + 2];
-		macs.octet[2] = buff[base + 3];
-		macs.octet[3] = buff[base + 4];
-		macs.octet[4] = buff[base + 5];
-		macs.octet[5] = buff[base + 6];
-
-		/* ip du questionneur */
-		ip_32.bytes[3] = buff[base + 7];
-		ip_32.bytes[2] = buff[base + 8];
-		ip_32.bytes[1] = buff[base + 9];
-		ip_32.bytes[0] = buff[base + 10];
-		
-		/* ip du questionné */
-		ip_33.bytes[3] = buff[base + 17];
-		ip_33.bytes[2] = buff[base + 18];
-		ip_33.bytes[1] = buff[base + 19];
-		ip_33.bytes[0] = buff[base + 20];
-
-		data = data_exist(&macs);
-		data_tomac(macs, smacs);
-		
-		snprintf((char *)ip, 16, "%u.%u.%u.%u", 
-			ip_32.bytes[3], ip_32.bytes[2], ip_32.bytes[1], ip_32.bytes[0]);
-		snprintf((char *)iq, 16, "%u.%u.%u.%u", 
-			ip_33.bytes[3], ip_33.bytes[2], ip_33.bytes[1], ip_33.bytes[0]);
-		
-		/****************************************************
-		 * begin of arp dependant traitments 
-		 ****************************************************/
-		
-		/* non authorized request */
-		if(config[CF_AUTHFILE].valeur.string[0]!=0){
-			flag=TRUE;
-			if(config[CF_IGNORE_UNKNOW].valeur.integer == TRUE){
-				if(data == NULL){
-					flag=FALSE;
-				} else {
-					if(data[0].flag != ALLOW){
-						flag=FALSE;
-					}
-				}
-			}
-	
-			if(data != NULL && config[CF_IGNORESELFTEST].valeur.integer == TRUE){
-				if(data->ip.ip == ip_33.ip){
-					flag = FALSE;
-				}
-			}
-			
-			if(dataeth != NULL){
-				// flood control 
-				if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 1){
-					if(timeact - dataeth->lastalert[4] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-						dataeth->lastalert[4] = timeact;
-					} else {
-						flag=FALSE;
-					}
-				// flood control by tuple (mac / ip)
-				} else if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2 &&
-				          config[CF_ANTIFLOOD_INTER].valeur.integer != 0 ){
-					if(sens_timeout_exist(&maceth, ip_33) == TRUE){
-						flag = FALSE;
-					} else {
-						sens_timeout_add(&maceth, ip_33);
-					}
-				}
-			}		
-			
-			if(flag==TRUE){
-				if(sens_exist(&maceth, ip_33)==FALSE){
-					if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
-						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", 
-						       seq, smacs, ip, iq);
-					}
-					if(config[CF_ALERT_UNAUTH_RQ].valeur.integer == TRUE){
-						ret = alerte(smacs, ip, iq, 4);
-						#ifdef DEBUG
-						if(ret > 0){
-							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-								__FILE__, __LINE__, ret);
-						}
-						#endif
-					}
-				}
-			}
-		}
-
-		/* test ip change */
-		if(data != NULL){
-			#ifdef DEBUG
-			logmsg(LOG_DEBUG, "[%s %i] test ip change: %d - %d > %d", 
-				__FILE__, __LINE__, timeact, data->lastalert[0], config[CF_ANTIFLOOD_INTER].valeur.integer);
-			#endif
-			if(data[0].ip.ip != ip_32.ip
-			&& data[0].ip.ip != broadcast.ip
-			){
-				if(data[0].ip.ip != 0 && ip_32.ip != 0){
-					if(timeact - data->lastalert[0] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-						data->lastalert[0] = timeact;
-						snprintf((char *)ip_tmp, 16, "%u.%u.%u.%u",
-							data[0].ip.bytes[3], data[0].ip.bytes[2], 
-							data[0].ip.bytes[1], data[0].ip.bytes[0]);
-						if(config[CF_LOGIP].valeur.integer == TRUE){
-							logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change",
-								seq, smacs, ip, ip_tmp); 
-						}	
-				
-						if(config[CF_ALRIP].valeur.integer == TRUE){
-							ret = alerte(smacseth, ip, ip_tmp, 0); 
-							#ifdef DEBUG
-							if(ret > 0){
-								logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-									__FILE__, __LINE__, ret);
-							}
-							#endif
-						}
-					}
-				} else if(data->ip.ip == 0 && ip_32.ip != 0) {
-					if(config[CF_LOGNEW].valeur.integer == TRUE){
-						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new",
-						       seq, smacseth, ip);
-					}
-			
-					if(config[CF_ALRNEW].valeur.integer == TRUE){
-						ret = alerte(smacseth, ip, "", 3);
-						#ifdef DEBUG
-						if(ret > 0){
-							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-							       __FILE__, __LINE__, ret);
-						}
-						#endif
-					}
-					
-					flagdump = TRUE;
-				}
-				data[0].ip.ip = ip_32.ip;
-				flagdump = TRUE;
-			}
-		}
-
-		/* error with ethernet mac and arp mac*/
-		if(dataeth != NULL){
-			if(timeact - dataeth->lastalert[6] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-				dataeth->lastalert[6] = timeact;
-				if(macs.octet[0]!=maceth.octet[0] || \
-				   macs.octet[1]!=maceth.octet[1] || \
-				   macs.octet[2]!=maceth.octet[2] || \
-				   macs.octet[3]!=maceth.octet[3] || \
-				   macs.octet[4]!=maceth.octet[4] || \
-				   macs.octet[5]!=maceth.octet[5]){
-					if(config[CF_LOG_BOGON].valeur.integer == TRUE){
-						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_error",
-						seq, smacseth, ip, smacs);
-					}
-		
-					if(config[CF_ALR_BOGON].valeur.integer == TRUE){
-						ret = alerte(smacseth, ip, smacs, 6);
-						#ifdef DEBUG
-						if(ret > 0){
-							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-							       __FILE__, __LINE__, ret);
-						}
-						#endif
-					}
-				}
-			}
-		}
-
-		/* excessive request */
-		if(dataeth!=NULL){
-			if(dataeth[0].timestamp == timeact){
-				dataeth[0].request++;
-				if(dataeth[0].request == config[CF_ABUS].valeur.integer + 1){
-					if(timeact - dataeth->lastalert[5] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-						dataeth->lastalert[5] = timeact;
-						if(config[CF_LOG_ABUS].valeur.integer == TRUE){
-							logmsg(LOG_NOTICE, "sec=%d, mac=%s, ip=%s, type=rqabus", 
-								seq, smacseth, ip);
-						}
-	
-						if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
-							ret = alerte(smacseth, ip, "", 5);
-							#ifdef DEBUG
-							if(ret > 0){
-								logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-								       __FILE__, __LINE__, ret);
-							}
-							#endif
-						}
-					}
-				}
-			} else {
-				dataeth[0].timestamp = timeact;
-				dataeth[0].request = 0;
-			}
-		}
-		/****************************************************
-		 * end of arp dependant traitments 
-		 ****************************************************/
 	}
 	
-	/* si pas d'adresse identifiée */
-	if(dataeth == NULL){
-		if(ip_32.ip==0){
-			if(config[CF_LOGNEW].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new_mac", seq, smacseth, ip);
-			}
-	
-			if(config[CF_ALRNEW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, "", 8);
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-					       __FILE__, __LINE__, ret);
-				}
-				#endif
-			}
-			
-			data_add(&maceth, APPEND, ip_32.ip);
-			flagdump = TRUE;
-		} else {
-			if(config[CF_LOGNEW].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new", seq, smacseth, ip);
-			}
-	
-			if(config[CF_ALRNEW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, "", 3);
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i",
-					       __FILE__, __LINE__, ret);
-				}
-				#endif
-			}
-			
-			data_add(&maceth, APPEND, ip_32.ip);
-			flagdump = TRUE;
-		}
-	}
-	
-	/* si entrée ajoutée mais non reference */
-	if(dataeth != NULL){
-		if(dataeth[0].flag == APPEND && 
-		timeact - dataeth->lastalert[1] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-			dataeth->lastalert[1] = timeact;
-			if(config[CF_LOGALLOW].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d mac=%s, ip=%s, type=unknow_address", 
-					seq, smacseth, ip);
-			}
+	// =====================================
+	// ARP general flood detection
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"ARP general flood detection\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// is an arp request
+		flag_is_arp == TRUE &&
 
-			if(config[CF_ALRALLOW].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, "", 1); 
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i",
-					       __FILE__, __LINE__, ret);
-				}
-				#endif
-			}
-		}
-	}
-	
-	/* si entree interdite */
-	if(dataeth != NULL){
-		if(dataeth[0].flag == DENY &&
-		timeact - dataeth->lastalert[2] >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-			dataeth->lastalert[2] = timeact;
-			if(config[CF_LOGDENY].valeur.integer == TRUE){
-				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=black_listed",
-				       seq, smacseth, ip);
-			}
-
-			if(config[CF_ALRDENY].valeur.integer == TRUE){
-				ret = alerte(smacseth, ip, "", 2); 
-				#ifdef DEBUG
-				if(ret > 0){
-					logmsg(LOG_DEBUG, "[%s %i] Forked with pid %i",
-					       __FILE__, __LINE__, ret);
-				}
-				#endif
-			}
-		}
-		
+		// global arp flood
+		count > config[CF_ANTIFLOOD_GLOBAL].valeur.integer
+	){
 		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] Capture ended", __FILE__, __LINE__);
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
 		#endif
+
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+		ARP_IP_RCPT
+		
+		if(config[CF_LOG_FLOOD].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=flood",
+			       seq, str_eth_mac_sender, str_arp_ip_sender, str_arp_ip_rcpt);
+		}
+		if(config[CF_ALERT_ON_FLOOD].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, str_arp_ip_rcpt, 7);
+		}
+		return;
+	}
+		
+	// =====================================
+	//  New mac adress detection
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"New mac adress detection\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// mac adress inconue
+		eth_data == NULL && 
+
+		// ip unknown
+		arp_ip_sender.ip == 0
+	) {
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// add data to database
+		eth_data = data_add(eth_mac_sender, APPEND, arp_ip_sender.ip);
+
+		// allow to dump data
+		flagdump = TRUE;
+
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+		
+		if(config[CF_LOGNEWMAC].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new_mac",
+			       seq, str_eth_mac_sender, str_arp_ip_sender);
+		}
+		if(config[CF_ALRNEWMAC].valeur.integer == TRUE){	
+			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 8);
+		}
+	}
+
+	// =====================================
+	//  New mac adress and ip detection
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"New mac adress and ip detection\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if (
+		// ip known
+		arp_ip_sender.ip != 0 &&
+		
+		(
+			// mac adress inconue
+			eth_data == NULL ||
+
+			// ip inconue
+			eth_data->ip.ip == 0
+		)
+	) {
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// add data to database
+		if(eth_data == NULL) {
+			eth_data = data_add(eth_mac_sender, APPEND, arp_ip_sender.ip);
+		} else {
+			eth_data->ip.ip = arp_ip_sender.ip;
+			index_ip(eth_data);
+		}
+			
+		// allow to dump data
+		flagdump = TRUE;
+
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+
+		if(config[CF_LOGNEW].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new",
+			       seq, str_eth_mac_sender, str_arp_ip_sender);
+		}
+		if(config[CF_ALRNEW].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 3);
+		}
+	}
+	
+	// =====================================
+	// test mac change
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"test mac change\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// check if this alert is configured
+		(
+			config[CF_ALERT_MACCHG].valeur.integer == TRUE ||
+			config[CF_LOG_MACCHG].valeur.integer == TRUE
+		) &&
+
+		// sender is known
+		arp_ip_sender.ip != 0 &&
+
+		// sender exist
+		(ip_data = data_ip_exist(arp_ip_sender.ip)) != NULL &&
+
+		// if the bitfield is not active
+		ISSET_MAC_CHANGE(eth_data->alerts) == FALSE &&
+		
+		// have different mac address
+		//data_cmp(&ip_data->mac.octet[0], eth_mac_sender) != 0
+		ip_data != eth_data
+	){
+		// maj ip in database
+		unindex_ip(arp_ip_sender.ip);
+		eth_data->ip.ip = arp_ip_sender.ip;
+		index_ip(eth_data);
+
+		// can dump database
+		flagdump = TRUE;
+	
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+		MAC_TO_STR(ip_data->mac, mac_tmp);
+
+		if(config[CF_LOG_MACCHG].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_change",
+			       seq, str_eth_mac_sender, str_arp_ip_sender, mac_tmp);
+		}
+		if(config[CF_ALERT_MACCHG].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 9);
+		}
+	}
+
+	// =====================================
+	// test ip change
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"test ip change\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// if ip known different than ip detected
+		eth_data->ip.ip != arp_ip_sender.ip &&
+
+		// if ip known differnent then a broadcast
+		// ( protect aliases )
+		eth_data->ip.ip != broadcast.ip &&
+			
+		// if ip known different than a nul adress
+		// (mac already detected but whitout ip)
+		eth_data->ip.ip != 0 &&
+
+		// ip detected different than null adress
+		arp_ip_sender.ip != 0 &&
+			
+		// if the bitfield is not active
+		ISSET_IP_CHANGE(eth_data->alerts) == FALSE &&
+		
+		// check timeouts
+		timeact - eth_data->lastalert[0] >= config[CF_ANTIFLOOD_INTER].valeur.integer
+	){
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// maj timeout
+		eth_data->lastalert[0] = timeact;
+					
+		// maj database
+		eth_data->ip.ip = arp_ip_sender.ip;
+		index_ip(eth_data);
+
+		// can dump database
+		flagdump = TRUE;
+	
+		// convert ip to string
+		IP_TO_STR(eth_data->ip, ip_tmp);
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+	
+		if(config[CF_LOGIP].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change",
+			       seq, str_eth_mac_sender, str_arp_ip_sender, ip_tmp); 
+		}	
+		if(config[CF_ALRIP].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, ip_tmp, 0); 
+		}
+	}
+
+	// =====================================
+	// non authorized request
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"non authorized request\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// check if loggued
+		config[CF_LOG_UNAUTH_RQ].valeur.integer + config[CF_ALERT_UNAUTH_RQ].valeur.integer != FALSE &&
+		
+		// is an arp request
+		flag_is_arp == TRUE &&
+
+		// the authfile do not complited
+		config[CF_AUTHFILE].valeur.string[0] != 0 &&
+		
+		// if the bitfield is not active
+		ISSET_UNAUTH_RQ(eth_data->alerts) == FALSE &&
+		
+		(
+			// permit to ignore acl for not referenced machines
+			config[CF_IGNORE_UNKNOWN].valeur.integer == FALSE ||
+			eth_data->flag == ALLOW
+		) &&
+			
+		(
+			// permit to ignore arp self test
+			config[CF_IGNORESELFTEST].valeur.integer == FALSE ||
+			eth_data->ip.ip != arp_ip_rcpt.ip
+		) &&
+
+		(
+			// normal flood control 
+			config[CF_UNAUTH_TO_METHOD].valeur.integer != 1 ||
+			timeact - eth_data->lastalert[4] >= config[CF_ANTIFLOOD_INTER].valeur.integer
+		) &&
+		
+		(
+			// flood control by tuple (mac / ip)
+			config[CF_UNAUTH_TO_METHOD].valeur.integer != 2 ||
+			sens_timeout_exist(eth_mac_sender, arp_ip_rcpt) == FALSE
+		) &&
+			
+		// check if request is authorized
+		sens_exist(eth_mac_sender, arp_ip_rcpt) == FALSE
+
+	){
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// add info for advanced timeouts 
+		if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2 &&
+		   config[CF_ANTIFLOOD_INTER].valeur.integer != 0){
+			sens_timeout_add(eth_mac_sender, arp_ip_rcpt);
+		}
+
+		// add info for simple timeout
+		eth_data->lastalert[4] = timeact;
+
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+		ARP_IP_RCPT
+
+		// ALERT
+		if(config[CF_LOG_UNAUTH_RQ].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, rq=%s, type=unauthrq", 
+			       seq, str_eth_mac_sender, str_arp_ip_sender, str_arp_ip_rcpt);
+		}
+		if(config[CF_ALERT_UNAUTH_RQ].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, str_arp_ip_rcpt, 4);
+		}
+	}
+
+	// =====================================
+	// error with ethernet mac and arp mac
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"error with ethernet mac and arp mac\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// check if loggued
+		config[CF_LOG_BOGON].valeur.integer + config[CF_ALR_BOGON].valeur.integer != FALSE &&
+		
+		// is an arp request
+		flag_is_arp == TRUE &&
+
+		// verif timeout
+		timeact - eth_data->lastalert[6] >= config[CF_ANTIFLOOD_INTER].valeur.integer &&
+
+		// if the bitfield is not active
+		ISSET_MAC_ERROR(eth_data->alerts) == FALSE &&
+		
+		// if arp mac adress and eth mac adress are differents
+		data_cmp(arp_mac_sender, eth_mac_sender) != 0
+	) {
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		eth_data->lastalert[6] = timeact;
+
+		STR_ETH_MAC_SENDER
+		STR_ARP_MAC_SENDER
+		ARP_IP_SENDER
+
+		if(config[CF_LOG_BOGON].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_error",
+			seq, str_eth_mac_sender, str_arp_ip_sender, str_arp_mac_sender);
+		}
+		if(config[CF_ALR_BOGON].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, str_arp_mac_sender, 6);
+		}
+	}
+
+	// =====================================
+	// excessive request by mac
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"excessive request\" Check ...",			
+	       __FILE__, __LINE__);
+	#endif
+	// increment counter for known mac sender
+	if(flag_is_arp == TRUE && eth_data->timestamp == timeact){
+		eth_data->request++;
+	} else {
+		eth_data->request = 1;
+		eth_data->timestamp = timeact;
+	}
+	if(
+		// check if loggued
+		config[CF_LOG_ABUS].valeur.integer + config[CF_ALERT_ABUS].valeur.integer != FALSE &&
+		
+		// is an arp request
+		flag_is_arp == TRUE &&
+		
+		// check the number of alerts
+		eth_data->request == config[CF_ABUS].valeur.integer &&
+	
+		// if the bitfield is not active
+		ISSET_RQ_ABUS(eth_data->alerts) == FALSE &&
+		
+		// chack anti flood
+		timeact - eth_data->lastalert[5] >= config[CF_ANTIFLOOD_INTER].valeur.integer
+	){
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// maj anti flood
+		eth_data->lastalert[5] = timeact;
+
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+
+		if(config[CF_LOG_ABUS].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "sec=%d, mac=%s, ip=%s, type=rqabus", 
+			       seq, str_eth_mac_sender, str_arp_ip_sender);
+		}
+		if(config[CF_ALERT_ABUS].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 5);
+		}	
+	}
+	
+	// =====================================
+	// know but not referenced in allow file
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"know but not referenced in allow file\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// check if loggued
+		config[CF_LOGALLOW].valeur.integer + config[CF_ALRALLOW].valeur.integer != FALSE &&
+		
+		// append but not in file
+		eth_data->flag == APPEND &&
+
+		// known from last check
+		flag_unknown_address == FALSE &&
+
+		// check flood
+		timeact - eth_data->lastalert[1] >= config[CF_ANTIFLOOD_INTER].valeur.integer
+	){
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// maj timeout
+		eth_data->lastalert[1] = timeact;
+	
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+
+		if(config[CF_LOGALLOW].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d mac=%s, ip=%s, type=unknow_address", 
+			       seq, str_eth_mac_sender, str_arp_ip_sender);
+		}
+		if(config[CF_ALRALLOW].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 1); 
+		}
+	}
+	
+	// =====================================
+	// Present in deny file
+	// =====================================
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %d] \"Present in deny file\" Check ...",
+	       __FILE__, __LINE__);
+	#endif
+	if(
+		// check if loggued
+		config[CF_LOGDENY].valeur.integer + config[CF_ALRDENY].valeur.integer != FALSE &&
+		
+		// mac is deny
+		eth_data->flag == DENY &&
+
+		// if the bitfield is not active
+		ISSET_BLACK_LISTED(eth_data->alerts) == FALSE &&
+		
+		// chack for anti flood
+		timeact - eth_data->lastalert[2] >= config[CF_ANTIFLOOD_INTER].valeur.integer
+	){
+		#ifdef DEBUG
+		logmsg(LOG_DEBUG, "[%s %d] \"DETECTED", __FILE__, __LINE__);
+		#endif
+		
+		// maj antiflood
+		eth_data->lastalert[2] = timeact;
+
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+
+		if(config[CF_LOGDENY].valeur.integer == TRUE){
+			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=black_listed",
+			       seq, str_eth_mac_sender, str_arp_ip_sender);
+		}
+		if(config[CF_ALRDENY].valeur.integer == TRUE){
+			alerte(str_eth_mac_sender, str_arp_ip_sender, "", 2); 
+		}
 	}
 }
 

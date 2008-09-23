@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: arpalert.c 86 2006-05-09 07:43:38Z thierry $
+ *
+ */
+
+
 #include "config.h"
 
 #include <fcntl.h>
@@ -10,6 +17,7 @@
 #include <unistd.h>
 #include <time.h>
 
+#include "arpalert.h"
 #include "loadconfig.h"
 #include "log.h"
 #include "data.h"
@@ -20,8 +28,7 @@
 #include "sens.h"
 #include "sens_timeouts.h"
 
-/* intervalle entre deux checkpoint 
- * le 0 desactve le dump regulier */
+// system check every seconds
 #define CHECKPOINT 1
 
 void die(int);
@@ -35,24 +42,28 @@ int dumptime = 0;
 int nettoyage = 0;
 
 int main(int argc, char **argv){
+	
+	// init current_time
+	current_time = time(NULL);
+	
 	flagdump = TRUE;
 	
-	/* va lire le fichier de configuration */
+	// read config file
 	config_load(argc, argv);
 	
-	/* log system initialization */
+	// log system initialization
 	initlog();
 	
-	/* initilaize pcap */
+	// pcap initialization
 	cap_init();
 
-	/* si il le faut, passer le binaire en daemon */
+	// daemonize arpalert
 	if(config[CF_DAEMON].valeur.integer == TRUE) daemonize();
 
-	/* separation des priviliges et chrooting */
+	// privilege separation and chrooting
 	separe();
 	
-	/* mise en place des signaux */
+	// set up signals
 	(void)setsignal(SIGINT,  die);
 	(void)setsignal(SIGTERM, die);
 	(void)setsignal(SIGQUIT, die);
@@ -60,30 +71,30 @@ int main(int argc, char **argv){
 	(void)setsignal(SIGHUP,  loadconfig); 
 	(void)setsignal(SIGALRM, dumpmaclist);
 
-	/* initialisation de la structure mac */
+	// mac sturcturs initialization
 	data_init();
 	sens_init();
 
-	/* sens_timeouts initializations */
+	// sens_timeouts initializations
 	if(config[CF_UNAUTH_TO_METHOD].valeur.integer == 2){
 		sens_timeout_init();
 	}
 	
-	/* INIT DES ALERTES */
+	// alert
 	if(config[CF_ACTION].valeur.string[0]!=0){
 		alerte_init();
 	}
 
-	/* chargement de la maclist */
+	// load maclist
 	maclist_reload();
 
-	/* init du compteur d'abus */
+	// init abuse counter
 	cap_abus();
 
-	/* declenchement des alarmes (dump database) */
+	// launch 1 second check
 	alarm(CHECKPOINT);
 
-	/* boucle principale */
+	// main boucle
 	cap_sniff();
 
 	exit(1);
@@ -93,8 +104,6 @@ void die(int signal){
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] End with signal: %i", __FILE__, __LINE__, signal);
 	#endif
-	data_close();
-	sens_free();
 	exit(0);
 }
 
@@ -107,23 +116,25 @@ void dumpmaclist(int signal){
 	#ifdef DEBUG 
 	logmsg(LOG_DEBUG, "[%s %i] entering dumpmaclist. 1s ...", __FILE__, __LINE__);
 	#endif
+	current_time = time(NULL);
 
 	/* dump toutes les 5s si demande active */
-	if((time(NULL) - dumptime) > 5){
-		if(flagdump == TRUE){
-			#ifdef DEBUG 
-			logmsg(LOG_DEBUG, "[%s %i] Signal %i: dump database", __FILE__, __LINE__, signal);
-			#endif
-			data_dump();
-			flagdump = FALSE;
-		}
-		dumptime = time(NULL);
+	if(
+		current_time - dumptime > 5 &&
+		flagdump == TRUE
+	){
+		#ifdef DEBUG 
+		logmsg(LOG_DEBUG, "[%s %i] Signal %i: dump database", __FILE__, __LINE__, signal);
+		#endif
+		data_dump();
+		flagdump = FALSE;
+		dumptime = current_time;
 	}
 
 	/* nettoyage toutes les minutes */
-	if((time(NULL) - nettoyage) >= 60){
+	if((current_time - nettoyage) >= 60){
 		data_clean(config[CF_TOOOLD].valeur.integer);
-		nettoyage = time(NULL);
+		nettoyage = current_time;
 	}
 
 	/* clean timeouts */

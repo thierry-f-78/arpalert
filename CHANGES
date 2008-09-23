@@ -1,3 +1,30 @@
+1.0.0:  * info<at>arpalert<dot>org:
+          rewrite detection code.
+		    rewrite data storage code.
+			 rewrite pid gestion code.
+          possibility to write comments in allow / deny files.
+			 possibility to ignore mac only new detection
+			 possibility to ignore certains types of detection by mac address
+			   (solution for ip alias)
+          for developpers:
+          function "make pdf" makes a sources pdf files with syntax color.
+          for fun: "make stats" returns the total number of line code (only .c and .h).
+          "make dependencies" generate dependencies for header file (for writing correctly the Makefile)
+
+        * marco.crotta<at>urmetcns<dot>it
+          add new detection function: detect mac change
+
+        * benoit.leroux<at>gmail<dot>com
+          Add exemple mail alert script.
+
+        * pterjan<at>linuxfr<dot>org
+          Add DESTDIR variable in Makefile.
+
+        * robert<dot>perriero<at>gmail<dot>com
+          Add suse start script
+          Add FC4 start script
+			 Add 2 management scripts
+
 0.4.15: bugfix: probleme in function data_cmp
         rewrite many parts of code.
 
@@ -21,7 +48,7 @@
 
 0.4.11: Use priveleges separation
         Use chroot
-	Apply mask on files
+        Apply mask on files
         Port on openbsd, freebsd, netbsd
 
 0.4.10: I Write the man file
@@ -53,6 +80,6 @@
         Security fail patched
 
 03b:    FUNCTION: the use of autoconf / automake is now avalaible
-03b:    BUG: The soft not inform th user when the config file is not accessible.
+        BUG: The soft not inform th user when the config file is not accessible.
 
 02b:    FUNCTION: The config is choosable by the command line (-f /config/file)

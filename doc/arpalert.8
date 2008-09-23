@@ -1,7 +1,8 @@
-.\" Copyright 2005 Thierry FOURNIER tfournier@numericable.fr
-.\" Distributed under GPL
 .\"
-.TH ARPALERT 8 2005-10-01 "" "arp traffic monitoring"
+.\" Copyright (c) 2005-2010 Thierry FOURNIER
+.\" $Id: arpalert.8 95 2006-05-09 20:29:56Z thierry $
+.\"
+.TH ARPALERT 8 2006-05-09 "" "arp traffic monitoring"
 .SH NAME
 arpalert \- ARP traffic monitoring
 .SH DESCRIPTION
@@ -54,7 +55,7 @@ Use privileges separation whith this user
 \fBumask\fR = 177
 Uses this mask for the files created
 .TP
-\fBchroot dir\fR = @prefix@
+\fBchroot dir\fR = /home/thierry/arp_test/
 Use this directory for program jail
 .br
 If this option is commented the program does not chroot
@@ -68,7 +69,7 @@ the logs with syslog are disabled. Prefere to use the log file.
 .br
 All the path file are relative to the chroot dir (but not the config file)
 .TP
-\fBlog file\fR = @in_localstatedir@/log/arpalert.log
+\fBlog file\fR = /var/log/arpalert.log
 The program log into this file
 .br
 If this option is commented, the internal system log is not used
@@ -81,19 +82,19 @@ The level logged. the level are bitween 0 (emergency) and 7 (debug). if 3 is sel
 \fBuse syslog\fR = true
 If this option is false, the syslog system is disabled
 .TP
-\fBmaclist file\fR = @in_sysconfdir@/arpalert/maclist.allow
+\fBmaclist file\fR = /etc/arpalert/maclist.allow
 white list
 .TP
-\fBmaclist alert file\fR = @in_sysconfdir@/arpalert/maclist.deny
+\fBmaclist alert file\fR = /etc/arpalert/maclist.deny
 black list
 .TP
-\fBmaclist leases file\fR = @in_localstatedir@/lib/arpalert/arpalert.leases
+\fBmaclist leases file\fR = /var/lib/arpalert/arpalert.leases
 dump fil
 .TP
-\fBauth request file\fR = @in_sysconfdir@/arpalert/authrq.conf
+\fBauth request file\fR = /etc/arpalert/authrq.conf
 list of authorized request"
 .TP
-\fBLock file\fR = @in_localstatedir@/run/arpalert.lock
+\fBLock file\fR = /var/run/arpalert.lock
 pid file
 .TP
 \fBdump paquet\fR = false
@@ -227,14 +228,28 @@ launch script if have too many arp request per seconds
 .\"
 .SH DATA FILES FORMATS
 .TP
-\fB@in_sysconfdir@/arpalert/maclist.allow\fR and \fB@in_sysconfdir@/arpalert/maclist.deny\fR:
+\fB/etc/arpalert/maclist.allow\fR and \fB/etc/arpalert/maclist.deny\fR:
 all the line with # as a \fBfirst\fR caracter are ignored
 .br
 The data on this file take this form
 .br
-<MAC_ADRESS><BLANK_SPACE><IP_ADDRESS>
+<MAC_ADRESS><BLANK_SPACE><IP_ADDRESS><BLANK_SPACE>[<FLAG>,<FLAG>,<FLAG>,...]
+.br
+The available flags are:
+.br
+\fBip_change:\fR Ignore ip change alert for this mac address
+.br
+\fBblack_listed:\fR Ignore black list alerts for this mac address
+.br
+\fBunauth_rq:\fR Ignore unauthorized requests for this mac address
+.br
+\fBrq_abus:\fR Ignore request abus for this mac address
+.br
+\fBmac_error:\fR Ignore mac error for this mac address
+.br
+\fBmac_change:\fR Ignore mac change for this mac address
 .TP
-\fB@in_sysconfdir@/arpalert/authrq.conf\fR:
+\fB/etc/arpalert/authrq.conf\fR:
 all the word after # caracter are ignored
 .br
 all the blank characters are ignored

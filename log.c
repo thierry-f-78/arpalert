@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: log.c 86 2006-05-09 07:43:38Z thierry $
+ *
+ */
+
 #include "config.h"
 
 #include <stdio.h>
@@ -12,6 +18,7 @@
 #include <syslog.h>
 #endif
 
+#include "arpalert.h"
 #include "log.h"
 #include "loadconfig.h"
 
@@ -31,72 +38,75 @@ const char *mois[12] = {
 	"Dec"
 };
 
-void openlogfile(void);
-
 void initlog(void){
 	#ifdef USE_SYSLOG
 	if(config[CF_USESYSLOG].valeur.integer == TRUE){
 		openlog("arpalert", LOG_CONS, LOG_DAEMON);
 	}
 	#endif
-	if(config[CF_LOGFILE].valeur.string[0] != 0)
-		openlogfile();
-}
-
-void openlogfile(void){
-	if((lf = fopen(config[CF_LOGFILE].valeur.string, "a"))==NULL){
-		fprintf(stderr, "[%s %d] Cant't open file [%s]\n",
-			__FILE__, __LINE__, config[CF_LOGFILE].valeur.string);
-		exit(1);
+	if(config[CF_LOGFILE].valeur.string[0] != 0){
+		if((lf = fopen(config[CF_LOGFILE].valeur.string, "a"))==NULL){
+			fprintf(stderr, "[%s %d] Cant't open file [%s]\n",
+			        __FILE__, __LINE__, config[CF_LOGFILE].valeur.string);
+			exit(1);
+		}
 	}
 }
 
 void logmsg(int priority, const char *fmt, ...){
 	va_list ap;
 	char msg[4096];
-	char s_time[128];
 	struct tm *tm;
-	time_t atime;
 
-	/* check if I do log this priority */
-	if(priority > config[CF_LOGLEVEL].valeur.integer)return;
+	// return if do not log in file or on standard output
+	if(
+		// check if I do log this priority
+		priority > config[CF_LOGLEVEL].valeur.integer ||
+
+		(
+			config[CF_LOGFILE].valeur.string[0] == 0 &&
+			config[CF_DAEMON].valeur.integer == TRUE
+			#ifdef USE_SYSLOG
+			&& config[CF_USESYSLOG].valeur.integer == FALSE
+			#endif
+		)
+	){
+		return;
+	}
+
+	//get current tim 
+	tm = localtime(&current_time);
+
+	va_start(ap, fmt);
+	vsnprintf(msg, 4096, fmt, ap);
+	va_end(ap);
 
 	#ifdef USE_SYSLOG
 	if(config[CF_USESYSLOG].valeur.integer == TRUE){
-		va_start(ap, fmt);
-		vsyslog(priority, fmt, ap); 
-		vsnprintf(msg, 4096, fmt, ap);
+		syslog(priority, msg); 
 	}
 	#endif
 
-	if(config[CF_LOGFILE].valeur.string[0] != 0 || config[CF_DAEMON].valeur.integer == FALSE){
-		//snprintf(s_time, 128, "%d: ", (int)time(NULL));
-		atime = time(NULL);
-		tm=localtime(&atime);
-		snprintf(s_time, 128, "%s % 2d %02d:%02d:%02d arpalert: ",
-			mois[tm->tm_mon],
-			tm->tm_mday,
-			tm->tm_hour,
-			tm->tm_min,
-			tm->tm_sec
-		);
-		//tm->tm_year+1900,
-		va_start(ap, fmt);
-		vsnprintf(msg, 4096, fmt, ap);
-		va_end(ap);
-	}
-
 	if(config[CF_LOGFILE].valeur.string[0] != 0){
-		fprintf(lf, s_time);
-		fprintf(lf, msg);
-		fprintf(lf, "\n");
+		fprintf(lf, "%s % 2d %02d:%02d:%02d arpalert: %s\n",
+		        mois[tm->tm_mon],
+		        tm->tm_mday,
+		        tm->tm_hour,
+		        tm->tm_min,
+		        tm->tm_sec, 
+		        //for year: tm->tm_year+1900,
+		        msg);
 		fflush(lf);
 	}
 
 	if(config[CF_DAEMON].valeur.integer == FALSE){
-		printf("%s", s_time);
-		printf("%s", msg);
-		printf("\n");
+		printf("%s % 2d %02d:%02d:%02d arpalert:  %s\n", 
+		        mois[tm->tm_mon],
+		        tm->tm_mday,
+		        tm->tm_hour,
+		        tm->tm_min,
+		        tm->tm_sec, 
+		        msg);
 	}
 }
 

@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2005-2010 Thierry FOURNIER
+# $Id: Makefile.in 97 2006-05-09 20:33:32Z thierry $
+# 
+
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 bindir = @bindir@
@@ -18,7 +23,9 @@ log_dir = @localstatedir@/log
 src_dir = .
 
 CC = @CC@
-CFLAGS = -Wall -O2 -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
+CFLAGS = -Wall -O2  \
+         -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" \
+         -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
 LIBS = @LIBS@
 OBJECT_LIST = \
 	$(src_dir)/arpalert.o \
@@ -35,27 +42,28 @@ OBJECT_LIST = \
 arpalert: $(OBJECT_LIST)
 	$(CC) $(CFLAGS) -g -O2 -o arpalert $(OBJECT_LIST) $(LIBS)
 
-log.o: log.c log.h config.h loadconfig.h
-	$(CC) $(CFLAGS) -c -o log.o $(src_dir)/log.c $(DEFS)
+alerte.o: alerte.c config.h alerte.h log.h loadconfig.h errmsg.h serveur.h
+	$(CC) $(CFLAGS) -c -o alerte.o $(src_dir)/alerte.c
+
+arpalert.o: arpalert.c config.h loadconfig.h log.h data.h maclist.h capture.h serveur.h \
+            alerte.h sens.h sens_timeouts.h
+	$(CC) $(CFLAGS) -c -o arpalert.o $(src_dir)/arpalert.c
+
+capture.o: capture.c config.h capture.h sens.h log.h loadconfig.h data.h \
+           alerte.h sens_timeouts.h
+	$(CC) $(CFLAGS) -c -o capture.o $(src_dir)/capture.c
+
+data.o: data.c config.h data.h log.h loadconfig.h
+	$(CC) $(CFLAGS) -c -o data.o $(src_dir)/data.c
 
 loadconfig.o: loadconfig.c loadconfig.h config.h log.h
 	$(CC) $(CFLAGS) -c -o loadconfig.o $(src_dir)/loadconfig.c
 
-arpalert.o: arpalert.c config.h loadconfig.h log.h data.h maclist.h capture.h \
-            serveur.h alerte.h sens.h sens_timeouts.h
-	$(CC) $(CFLAGS) -c -o arpalert.o $(src_dir)/arpalert.c
-
-data.o: data.c data.h config.h log.h loadconfig.h
-	$(CC) $(CFLAGS) -c -o data.o $(src_dir)/data.c
+log.o: log.c log.h config.h loadconfig.h
+	$(CC) $(CFLAGS) -c -o log.o $(src_dir)/log.c $(DEFS)
 
 maclist.o: maclist.c maclist.h config.h data.h loadconfig.h log.h
 	$(CC) $(CFLAGS) -c -o maclist.o $(src_dir)/maclist.c
-
-serveur.o: serveur.c serveur.h config.h log.h loadconfig.h
-	$(CC) $(CFLAGS) -c -o serveur.o $(src_dir)/serveur.c
-
-capture.o: capture.c capture.h config.h sens.h log.h loadconfig.h data.h alerte.h sens_timeouts.h
-	$(CC) $(CFLAGS) -c -o capture.o $(src_dir)/capture.c
 
 sens.o: sens.c sens.h config.h loadconfig.h data.h log.h
 	$(CC) $(CFLAGS) -c -o sens.o $(src_dir)/sens.c
@@ -63,55 +71,83 @@ sens.o: sens.c sens.h config.h loadconfig.h data.h log.h
 sens_timeouts.o: sens_timeouts.c sens_timeouts.h config.h data.h log.h loadconfig.h
 	$(CC) $(CFLAGS) -c -o sens_timeouts.o $(src_dir)/sens_timeouts.c
 
-alerte.o: alerte.c alerte.h config.h log.h loadconfig.h errmsg.h
-	$(CC) $(CFLAGS) -c -o alerte.o $(src_dir)/alerte.c
+serveur.o: serveur.c serveur.h config.h log.h loadconfig.h
+	$(CC) $(CFLAGS) -c -o serveur.o $(src_dir)/serveur.c
+
+mrproper: clean
+	rm -rf arpalert-sources.pdf autom4te.cache configure Makefile \
+	       scripts/start/arpalert-debian scripts/start/arpalert-fc4 scripts/start/arpalert-suse config.h
 
 clean:
-	rm -f *~ *.o
-	rm -f arpalert
-	rm -f config.log
-	rm -f config.status
-
+	rm -f *~ *.o config.log config.status arpalert
+	
 install:
-	mkdir -p $(sbindir)
-	mkdir -p $(leases_dir)
-	mkdir -p $(lock_dir)
-	mkdir -p $(log_dir)
-	mkdir -p $(config_dir)	
-	mkdir -p $(mandir)/man8
-	cp -f doc/arpalert.8 $(mandir)/man8
-	cp -f arpalert $(sbindir)
-	test ! -f $(config_dir)/maclist.allow && > $(config_dir)/maclist.allow || /bin/true
-	test ! -f $(config_dir)/maclist.deny  && > $(config_dir)/maclist.deny  || /bin/true
-	if test ! -f $(config_dir)/arpalert.conf; \
+	mkdir -p $(DESTDIR)$(sbindir)
+	mkdir -p $(DESTDIR)$(leases_dir)
+	mkdir -p $(DESTDIR)$(lock_dir)
+	mkdir -p $(DESTDIR)$(log_dir)
+	mkdir -p $(DESTDIR)$(config_dir)	
+	mkdir -p $(DESTDIR)$(mandir)/man8
+	cp -f doc/arpalert.8 $(DESTDIR)$(mandir)/man8
+	cp -f arpalert $(DESTDIR)$(sbindir)
+	test ! -f $(DESTDIR)$(config_dir)/maclist.allow && > $(DESTDIR)$(config_dir)/maclist.allow || /bin/true
+	test ! -f $(DESTDIR)$(config_dir)/maclist.deny  && > $(DESTDIR)$(config_dir)/maclist.deny  || /bin/true
+	if test ! -f $(DESTDIR)$(config_dir)/arpalert.conf; \
 	then \
-	  > $(config_dir)/arpalert.conf; \
-	  echo "# white list" >> $(config_dir)/arpalert.conf; \
-	  echo "Maclist file = $(config_dir)/maclist.allow" >> $(config_dir)/arpalert.conf; \
-	  echo >> $(config_dir)/arpalert.conf; \
+	  > $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "# white list" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "Maclist file = $(config_dir)/maclist.allow" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
-	  echo "# black list" >> $(config_dir)/arpalert.conf; \
-	  echo "Maclist alert file = $(config_dir)/maclist.deny" >> $(config_dir)/arpalert.conf; \
-	  echo >> $(config_dir)/arpalert.conf; \
+	  echo "# black list" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "Maclist alert file = $(config_dir)/maclist.deny" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
-	  echo "# dump file" >> $(config_dir)/arpalert.conf; \
-	  echo "Maclist leases file = $(leases_dir)/arpalert.leases" >> $(config_dir)/arpalert.conf; \
-	  echo >> $(config_dir)/arpalert.conf; \
+	  echo "# dump file" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "Maclist leases file = $(leases_dir)/arpalert.leases" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
-	  echo "# list of authorized request" >> $(config_dir)/arpalert.conf; \
-	  echo "#Auth request file = $(config_dir)/authrq.conf" >> $(config_dir)/arpalert.conf; \
-	  echo >> $(config_dir)/arpalert.conf; \
+	  echo "# list of authorized request" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "#Auth request file = $(config_dir)/authrq.conf" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
-	  echo "# log file" >> $(config_dir)/arpalert.conf; \
-	  echo "#log file = $(log_dir)/arpalert.log" >> $(config_dir)/arpalert.conf; \
-	  echo >> $(config_dir)/arpalert.conf; \
+	  echo "# log file" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "#log file = $(log_dir)/arpalert.log" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
-	  echo "# pid file" >> $(config_dir)/arpalert.conf; \
-	  echo "Lock file = $(lock_dir)/arpalert.lock" >> $(config_dir)/arpalert.conf; \
-	  echo >> $(config_dir)/arpalert.conf; \
+	  echo "# pid file" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "Lock file = $(lock_dir)/arpalert.lock" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
-	  cat etc/arpalert.conf.in  >> $(config_dir)/arpalert.conf; \
+	  cat etc/arpalert.conf.in  >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	else \
 	  /bin/true; \
 	fi
+
+pdf: arpalert-sources.pdf
+
+arpalert-sources.pdf: alerte.h config.h errmsg.h log.h sens.h serveur.h capture.h data.h \
+                      loadconfig.h  maclist.h  sens_timeouts.h alerte.c capture.c loadconfig.c \
+                      maclist.c sens_timeouts.c arpalert.c data.c log.c sens.c serveur.c
+	enscript -j -E --header "\$$n||Page $$% of $$=" --color -T 3 -p - *.c *.h | ps2pdf - arpalert-sources.pdf
+
+stats:
+	echo; \
+	for files in $$(ls *.c; ls *.h); \
+	do \
+	printf "%15s:% 5d lines\n" $$files "$$( cat $$files | wc -l )"; \
+	done | sort -n +1; \
+	echo; \
+	printf "%15s:% 5d lines\n" "Total" "$$( ( cat *.c ; cat *.h ) | wc -l )"; \
+	echo
+
+dependencies:
+	echo; \
+	for files in $$(ls *.c); \
+	do \
+	printf \
+	"%15s: %s\n" \
+	$$files "$$(cat $$files | grep "#include \"" | sed -e "s/#include \"//; s/\"//" | xargs echo )"; \
+	done; echo; \
+							
 

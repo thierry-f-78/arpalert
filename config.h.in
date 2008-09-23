@@ -1,5 +1,10 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: config.h.in 59 2006-03-02 19:47:26Z thierry $
+ *
+ */
+
 #undef DEBUG
 #undef DEBUG_MALLOC
 #undef USE_SYSLOG
-/* #undef CONFIG_FILE */
 

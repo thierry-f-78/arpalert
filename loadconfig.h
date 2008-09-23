@@ -1,4 +1,13 @@
 /*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: loadconfig.h 60 2006-03-02 19:51:25Z thierry $
+ *
+ */
+
+#ifndef __LOADCONFIG_H__
+#define __LOADCONFIG_H__
+
+/*
  * types:
  *  0: char
  *  1: int
@@ -48,7 +57,7 @@
 #define CF_ALERT_ABUS       30
 #define CF_LOG_BOGON        31
 #define CF_ALR_BOGON        32
-#define CF_IGNORE_UNKNOW    33
+#define CF_IGNORE_UNKNOWN   33
 #define CF_DUMP_PAQUET      34
 #define CF_PROMISC          35
 #define CF_ANTIFLOOD_INTER  36
@@ -62,24 +71,35 @@
 #define CF_USESYSLOG        44
 #define CF_IGNORESELFTEST   45
 #define CF_UNAUTH_TO_METHOD 46
+#define CF_LOGNEWMAC        47
+#define CF_ALRNEWMAC        48
+#define CF_LOG_MACCHG       49
+#define CF_ALERT_MACCHG     50
 
-#define NUM_PARAMS          47
+#define NUM_PARAMS          51
 
+#define STRVAL_LEN 512
+#define ATTRIB_LEN 512
+#define CONFIGFILE_LEN 512
+
+// if true, the data is updated
 int flagdump;
 
 typedef union {
-	char	string[1024];
+	char	string[STRVAL_LEN];
 	int	integer;
 } config_val;
 
 typedef struct {
 	int		type;
-	char		attrib[512];
+	char		attrib[ATTRIB_LEN];
 	config_val	valeur;
 } config_cell;
 
 config_cell config[NUM_PARAMS];
-char config_file[2048];
+char config_file[CONFIGFILE_LEN];
 
+// load config file values
 void config_load(int, char **);
 
+#endif

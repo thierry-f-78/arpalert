@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: loadconfig.c 86 2006-05-09 07:43:38Z thierry $
+ *
+ */
+
 #include "config.h"
 
 #include <stdio.h>
@@ -5,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "arpalert.h"
 #include "loadconfig.h"
 #include "log.h"
 
@@ -15,7 +22,7 @@ int dump = 0;
 
 void miseenforme(char*);
 void miseenmemoire(char*);
-void tolower(char *);
+void to_lower(char *);
 char lowercase(char);
 int convert_octal(char*);
 int convert_int(char*);
@@ -39,208 +46,227 @@ void config_load(int argc, char *argv[]){
 	FILE *fp;
 	char buffer[4096];
 	char *buf;
-	char msgd[512];
 	int i;
 
 	/* loading default values */
 	config[CF_MACLIST].type = 0;
-	strncpy(config[CF_MACLIST].attrib, "maclist file", 512);
+	strncpy(config[CF_MACLIST].attrib, "maclist file", ATTRIB_LEN);
 	config[CF_MACLIST].valeur.string[0] = 0;
 	
 	config[CF_LOGFILE].type = 0;
-	strncpy(config[CF_LOGFILE].attrib, "log file", 512);
+	strncpy(config[CF_LOGFILE].attrib, "log file", ATTRIB_LEN);
 	config[CF_LOGFILE].valeur.string[0] = 0, "";
 	
 	config[CF_ACTION].type = 0;
-	strncpy(config[CF_ACTION].attrib, "action on detect", 512);
+	strncpy(config[CF_ACTION].attrib, "action on detect", ATTRIB_LEN);
 	config[CF_ACTION].valeur.string[0] = 0;
 	
 	config[CF_LOCKFILE].type = 0;
-	strncpy(config[CF_LOCKFILE].attrib, "lock file", 512);
-	strncpy(config[CF_LOCKFILE].valeur.string, PID_FILE, 1024);
+	strncpy(config[CF_LOCKFILE].attrib, "lock file", ATTRIB_LEN);
+	strncpy(config[CF_LOCKFILE].valeur.string, PID_FILE, STRVAL_LEN);
 	
 	config[CF_DAEMON].type = 2;
-	strncpy(config[CF_DAEMON].attrib, "daemon", 512);
+	strncpy(config[CF_DAEMON].attrib, "daemon", ATTRIB_LEN);
 	config[CF_DAEMON].valeur.integer = FALSE;
 	
 	config[CF_RELOAD].type = 1;
-	strncpy(config[CF_RELOAD].attrib, "reload interval", 512);
+	strncpy(config[CF_RELOAD].attrib, "reload interval", ATTRIB_LEN);
 	config[CF_RELOAD].valeur.integer = 600;
 	
 	config[CF_LOGLEVEL].type = 1;
-	strncpy(config[CF_LOGLEVEL].attrib, "log level", 512);
+	strncpy(config[CF_LOGLEVEL].attrib, "log level", ATTRIB_LEN);
 	config[CF_LOGLEVEL].valeur.integer = 6;
 	
 	config[CF_USESYSLOG].type = 2;
-	strncpy(config[CF_USESYSLOG].attrib, "use syslog", 512);
+	strncpy(config[CF_USESYSLOG].attrib, "use syslog", ATTRIB_LEN);
 	config[CF_USESYSLOG].valeur.integer = TRUE;
 	
 	config[CF_TIMEOUT].type = 1;
-	strncpy(config[CF_TIMEOUT].attrib, "execution timeout", 512);
+	strncpy(config[CF_TIMEOUT].attrib, "execution timeout", ATTRIB_LEN);
 	config[CF_TIMEOUT].valeur.integer = 10;
 
 	config[CF_MAXTH].type = 1;
-	strncpy(config[CF_MAXTH].attrib, "max alert", 512);
+	strncpy(config[CF_MAXTH].attrib, "max alert", ATTRIB_LEN);
 	config[CF_MAXTH].valeur.integer = 20;
 
 	config[CF_BLACKLST].type = 0;
-	strncpy(config[CF_BLACKLST].attrib, "maclist alert file", 512);
+	strncpy(config[CF_BLACKLST].attrib, "maclist alert file", ATTRIB_LEN);
 	config[CF_BLACKLST].valeur.string[0] = 0;
 	
 	config[CF_LEASES].type = 0;
-	strncpy(config[CF_LEASES].attrib, "maclist leases file", 512);
+	strncpy(config[CF_LEASES].attrib, "maclist leases file", ATTRIB_LEN);
 	config[CF_LEASES].valeur.string[0] = 0;
 	
 	config[CF_IF].type = 0;
-	strncpy(config[CF_IF].attrib, "interface", 512);
+	strncpy(config[CF_IF].attrib, "interface", ATTRIB_LEN);
 	config[CF_IF].valeur.string[0] = 0;
 
 	config[CF_ABUS].type = 1;
-	strncpy(config[CF_ABUS].attrib, "max request", 512);
+	strncpy(config[CF_ABUS].attrib, "max request", ATTRIB_LEN);
 	config[CF_ABUS].valeur.integer = 1000000;
 	
 	config[CF_MAXENTRY].type = 1;
-	strncpy(config[CF_MAXENTRY].attrib, "max entry", 512);
+	strncpy(config[CF_MAXENTRY].attrib, "max entry", ATTRIB_LEN);
 	config[CF_MAXENTRY].valeur.integer = 1048576;	/* 14Mo */
 	
 	config[CF_DMPWL].type = 2;
-	strncpy(config[CF_DMPWL].attrib, "dump white list", 512);
+	strncpy(config[CF_DMPWL].attrib, "dump white list", ATTRIB_LEN);
 	config[CF_DMPWL].valeur.integer = FALSE;
 			
 	config[CF_DMPBL].type = 2;
-	strncpy(config[CF_DMPBL].attrib, "dump black list", 512);
+	strncpy(config[CF_DMPBL].attrib, "dump black list", ATTRIB_LEN);
 	config[CF_DMPBL].valeur.integer = FALSE;
 		
 	config[CF_DMPAPP].type = 2;
-	strncpy(config[CF_DMPAPP].attrib, "dump new address", 512);
+	strncpy(config[CF_DMPAPP].attrib, "dump new address", ATTRIB_LEN);
 	config[CF_DMPAPP].valeur.integer = TRUE;
 	
 	config[CF_TOOOLD].type = 1;
-	strncpy(config[CF_TOOOLD].attrib, "mac timeout", 512);
+	strncpy(config[CF_TOOOLD].attrib, "mac timeout", ATTRIB_LEN);
 	config[CF_TOOOLD].valeur.integer = 2592000; /* 1 month */
 
 	config[CF_LOGALLOW].type = 2;
-	strncpy(config[CF_LOGALLOW].attrib, "log referenced address", 512);
+	strncpy(config[CF_LOGALLOW].attrib, "log referenced address", ATTRIB_LEN);
 	config[CF_LOGALLOW].valeur.integer = FALSE;
 	
 	config[CF_ALRALLOW].type = 2;
-	strncpy(config[CF_ALRALLOW].attrib, "alert on referenced address", 512);
+	strncpy(config[CF_ALRALLOW].attrib, "alert on referenced address", ATTRIB_LEN);
 	config[CF_ALRALLOW].valeur.integer = FALSE;
 	
 	config[CF_LOGDENY].type = 2;
-	strncpy(config[CF_LOGDENY].attrib, "log deny address", 512);
+	strncpy(config[CF_LOGDENY].attrib, "log deny address", ATTRIB_LEN);
 	config[CF_LOGDENY].valeur.integer = TRUE;
 	
 	config[CF_ALRDENY].type = 2;
-	strncpy(config[CF_ALRDENY].attrib, "alert on deny address", 512);
+	strncpy(config[CF_ALRDENY].attrib, "alert on deny address", ATTRIB_LEN);
 	config[CF_ALRDENY].valeur.integer = TRUE;
 
 	config[CF_LOGNEW].type = 2;
-	strncpy(config[CF_LOGNEW].attrib, "log new address", 512);
+	strncpy(config[CF_LOGNEW].attrib, "log new address", ATTRIB_LEN);
 	config[CF_LOGNEW].valeur.integer = TRUE;
 
 	config[CF_ALRNEW].type = 2;
-	strncpy(config[CF_ALRNEW].attrib, "alert on new address", 512);
+	strncpy(config[CF_ALRNEW].attrib, "alert on new address", ATTRIB_LEN);
 	config[CF_ALRNEW].valeur.integer = TRUE;
 
+	config[CF_LOGNEWMAC].type = 2;
+	strncpy(config[CF_LOGNEWMAC].attrib, "log new mac address", ATTRIB_LEN);
+	config[CF_LOGNEWMAC].valeur.integer = TRUE;
+
+	config[CF_ALRNEWMAC].type = 2;
+	strncpy(config[CF_ALRNEWMAC].attrib, "alert on new mac address", ATTRIB_LEN);
+	config[CF_ALRNEWMAC].valeur.integer = TRUE;
+
 	config[CF_ALRIP].type = 2;
-	strncpy(config[CF_ALRIP].attrib, "alert on ip change", 512);
+	strncpy(config[CF_ALRIP].attrib, "alert on ip change", ATTRIB_LEN);
 	config[CF_ALRIP].valeur.integer = TRUE;
 
 	config[CF_LOGIP].type = 2;
-	strncpy(config[CF_LOGIP].attrib, "log ip change", 512);
+	strncpy(config[CF_LOGIP].attrib, "log ip change", ATTRIB_LEN);
 	config[CF_LOGIP].valeur.integer = TRUE;
 
 	config[CF_AUTHFILE].type = 0;
-	strncpy(config[CF_AUTHFILE].attrib, "auth request file", 512);
+	strncpy(config[CF_AUTHFILE].attrib, "auth request file", ATTRIB_LEN);
 	config[CF_AUTHFILE].valeur.string[0] = 0;
 
 	config[CF_LOG_UNAUTH_RQ].type = 2;
-	strncpy(config[CF_LOG_UNAUTH_RQ].attrib, "log unauth request", 512);
+	strncpy(config[CF_LOG_UNAUTH_RQ].attrib, "log unauth request", ATTRIB_LEN);
 	config[CF_LOG_UNAUTH_RQ].valeur.integer = TRUE;
 
 	config[CF_ALERT_UNAUTH_RQ].type = 2;
-	strncpy(config[CF_ALERT_UNAUTH_RQ].attrib, "alert on unauth request", 512);
+	strncpy(config[CF_ALERT_UNAUTH_RQ].attrib, "alert on unauth request", ATTRIB_LEN);
 	config[CF_ALERT_UNAUTH_RQ].valeur.integer = TRUE;
 
 	config[CF_UNAUTH_TO_METHOD].type = 1;
-	strncpy(config[CF_UNAUTH_TO_METHOD].attrib, "unauth ignore time method", 512);
+	strncpy(config[CF_UNAUTH_TO_METHOD].attrib, "unauth ignore time method", ATTRIB_LEN);
 	config[CF_UNAUTH_TO_METHOD].valeur.integer = 2;
 	
 	config[CF_LOG_ABUS].type = 2;
-	strncpy(config[CF_LOG_ABUS].attrib, "log request abus", 512);
+	strncpy(config[CF_LOG_ABUS].attrib, "log request abus", ATTRIB_LEN);
 	config[CF_LOG_ABUS].valeur.integer = TRUE;
 
 	config[CF_ALERT_ABUS].type = 2;
-	strncpy(config[CF_ALERT_ABUS].attrib, "alert on request abus", 512);
+	strncpy(config[CF_ALERT_ABUS].attrib, "alert on request abus", ATTRIB_LEN);
 	config[CF_ALERT_ABUS].valeur.integer = TRUE;
 
 	config[CF_LOG_BOGON].type = 2;
-	strncpy(config[CF_LOG_BOGON].attrib, "log mac error", 512);
+	strncpy(config[CF_LOG_BOGON].attrib, "log mac error", ATTRIB_LEN);
 	config[CF_LOG_BOGON].valeur.integer = TRUE;
 
 	config[CF_ALR_BOGON].type = 2;
-	strncpy(config[CF_ALR_BOGON].attrib, "alert on mac error", 512);
+	strncpy(config[CF_ALR_BOGON].attrib, "alert on mac error", ATTRIB_LEN);
 	config[CF_ALR_BOGON].valeur.integer = TRUE;
 
-	config[CF_IGNORE_UNKNOW].type = 2;
-	strncpy(config[CF_IGNORE_UNKNOW].attrib, "ignore unknown sender", 512);
-	config[CF_IGNORE_UNKNOW].valeur.integer = TRUE;
+	config[CF_IGNORE_UNKNOWN].type = 2;
+	strncpy(config[CF_IGNORE_UNKNOWN].attrib, "ignore unknown sender", ATTRIB_LEN);
+	config[CF_IGNORE_UNKNOWN].valeur.integer = TRUE;
 
 	config[CF_DUMP_PAQUET].type = 2;
-	strncpy(config[CF_DUMP_PAQUET].attrib, "dump paquet", 512);
+	strncpy(config[CF_DUMP_PAQUET].attrib, "dump paquet", ATTRIB_LEN);
 	config[CF_DUMP_PAQUET].valeur.integer = FALSE;
 
 	config[CF_PROMISC].type = 2;
-	strncpy(config[CF_PROMISC].attrib, "promiscuous", 512);
+	strncpy(config[CF_PROMISC].attrib, "promiscuous", ATTRIB_LEN);
 	config[CF_PROMISC].valeur.integer = FALSE;
 
 	config[CF_ANTIFLOOD_INTER].type = 1;
-	strncpy(config[CF_ANTIFLOOD_INTER].attrib, "anti flood interval", 512);
+	strncpy(config[CF_ANTIFLOOD_INTER].attrib, "anti flood interval", ATTRIB_LEN);
 	config[CF_ANTIFLOOD_INTER].valeur.integer = 10; /* 10 secondes */
 	
 	config[CF_ANTIFLOOD_GLOBAL].type = 1;
-	strncpy(config[CF_ANTIFLOOD_GLOBAL].attrib, "anti flood global", 512);
+	strncpy(config[CF_ANTIFLOOD_GLOBAL].attrib, "anti flood global", ATTRIB_LEN);
 	config[CF_ANTIFLOOD_GLOBAL].valeur.integer = 50; /* 50 secondes */
 
 	config[CF_LOG_FLOOD].type = 2;
-	strncpy(config[CF_LOG_FLOOD].attrib, "log flood", 512);
+	strncpy(config[CF_LOG_FLOOD].attrib, "log flood", ATTRIB_LEN);
 	config[CF_LOG_FLOOD].valeur.integer = TRUE;
 
 	config[CF_ALERT_ON_FLOOD].type = 2;
-	strncpy(config[CF_ALERT_ON_FLOOD].attrib, "alert on flood", 512);
+	strncpy(config[CF_ALERT_ON_FLOOD].attrib, "alert on flood", ATTRIB_LEN);
 	config[CF_ALERT_ON_FLOOD].valeur.integer = TRUE;
 	
 	config[CF_IGNORE_ME].type = 2;
-	strncpy(config[CF_IGNORE_ME].attrib, "ignore me", 512);
+	strncpy(config[CF_IGNORE_ME].attrib, "ignore me", ATTRIB_LEN);
 	config[CF_IGNORE_ME].valeur.integer = TRUE;
 	
 	config[CF_UMASK].type = 3;
-	strncpy(config[CF_UMASK].attrib, "umask", 512);
+	strncpy(config[CF_UMASK].attrib, "umask", ATTRIB_LEN);
 	config[CF_UMASK].valeur.integer = 0133;
 
 	config[CF_USER].type = 0;
-	strncpy(config[CF_USER].attrib, "user", 512);
+	strncpy(config[CF_USER].attrib, "user", ATTRIB_LEN);
 	config[CF_USER].valeur.string[0] = 0;
 
 	config[CF_CHROOT].type = 0;
-	strncpy(config[CF_CHROOT].attrib, "chroot dir", 512);
+	strncpy(config[CF_CHROOT].attrib, "chroot dir", ATTRIB_LEN);
 	config[CF_CHROOT].valeur.string[0] = 0;
 
 	config[CF_IGNORESELFTEST].type = 2;
-	strncpy(config[CF_IGNORESELFTEST].attrib, "ignore self test", 512);
+	strncpy(config[CF_IGNORESELFTEST].attrib, "ignore self test", ATTRIB_LEN);
 	config[CF_IGNORESELFTEST].valeur.integer = TRUE;
 
+	config[CF_ALERT_MACCHG].type = 2;
+	strncpy(config[CF_ALERT_MACCHG].attrib, "alert on mac change", ATTRIB_LEN);
+	config[CF_ALERT_MACCHG].valeur.integer = TRUE; 
+
+	config[CF_LOG_MACCHG].type = 2;
+	strncpy(config[CF_LOG_MACCHG].attrib, "log mac change", ATTRIB_LEN);
+	config[CF_LOG_MACCHG].valeur.integer = TRUE; 
+							
+
 	// load command line parameters for config file
-	strncpy(config_file, CONFIG_FILE, 2048);
+	strncpy(config_file, CONFIG_FILE, CONFIGFILE_LEN);
 	for(i=1; i<argc; i++){
+		if(argv[i][0]=='-' && argv[i][1]=='h'){
+			usage();
+		}
 		if(argv[i][0]=='-' && argv[i][1]=='f'){
 			if(i+1 >= argc){
 				fprintf(stderr, "Option -f without argument\n");
 				usage();
 			}
 			i++;
-			strncpy(config_file, argv[i], 2048);
+			strncpy(config_file, argv[i], CONFIGFILE_LEN);
 		}
 	}
 
@@ -248,9 +274,8 @@ void config_load(int argc, char *argv[]){
 	buf = buffer;
 	fp = fopen(config_file, "r");
 	if(fp == NULL){
-		snprintf(msgd, 512, "[%s %i] don't found %s, loading default config\n",
+		fprintf(stderr, "[%s %i] didn't find %s, loading default config\n",
 			__FILE__, __LINE__, config_file);
-		fprintf(stderr, msgd);
 	} else {
 		while((buf = fgets(buf, 4096, fp)) != NULL){
 			miseenforme(buf);
@@ -276,7 +301,7 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
-					strncpy(config[CF_IF].valeur.string, argv[i], 1024);
+					strncpy(config[CF_IF].valeur.string, argv[i], STRVAL_LEN);
 					break;
 	
 				case 'p':
@@ -285,7 +310,7 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
-					strncpy(config[CF_LOCKFILE].valeur.string, argv[i], 1024);
+					strncpy(config[CF_LOCKFILE].valeur.string, argv[i], STRVAL_LEN);
 					break;
 	
 				case 'e':
@@ -294,7 +319,7 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
-					strncpy(config[CF_ACTION].valeur.string, argv[i], 1024);
+					strncpy(config[CF_ACTION].valeur.string, argv[i], STRVAL_LEN);
 					break;
 				
 				case 'D':
@@ -316,7 +341,7 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
-					strncpy(config[CF_LEASES].valeur.string, argv[i], 1024);
+					strncpy(config[CF_LEASES].valeur.string, argv[i], STRVAL_LEN);
 					break;
 	
 				case 'v':
@@ -433,9 +458,9 @@ void miseenmemoire(char *buf){
 	i = 0;
 	ok = 0;
 	while(i < NUM_PARAMS){
-		if(strncmp(g, config[i].attrib, 512)==0){
+		if(strncmp(g, config[i].attrib, ATTRIB_LEN)==0){
 			switch(config[i].type){
-				case 0: strncpy(config[i].valeur.string, d, 1024); break;
+				case 0: strncpy(config[i].valeur.string, d, STRVAL_LEN); break;
 				case 1: config[i].valeur.integer = convert_int(d); break;
 				case 2: config[i].valeur.integer = convert_boolean(d); break;
 				case 3: config[i].valeur.integer = convert_octal(d); break;
@@ -446,8 +471,9 @@ void miseenmemoire(char *buf){
 		i++;
 	}
 	if(ok == 0){
-		fprintf(stderr, "[%s %i] error in config file at line: \"%s\": parametre innexistant\n",
-			__FILE__, __LINE__, buf);
+		fprintf(stderr, "[%s %i] error in config file at "
+		        "line: \"%s\": parameter inexistent\n",
+		        __FILE__, __LINE__, buf);
 		exit(1);
 	}
 }
@@ -461,8 +487,9 @@ int convert_octal(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'7'){
-			fprintf(stderr, "[%s %i] error in config file in string \"%s\": octal value expected\n",
-				__FILE__, __LINE__, b);
+			fprintf(stderr, "[%s %i] error in config file in "
+			        "string \"%s\": octal value expected\n",
+			        __FILE__, __LINE__, b);
 			exit(1);
 		}
 		i = res;
@@ -480,8 +507,9 @@ int convert_int(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'9'){
-			fprintf(stderr, "[%s %i] error in config file in string \"%s\": integer value expected\n",
-				__FILE__, __LINE__, b);
+			fprintf(stderr, "[%s %i] error in config file in "
+			        "string \"%s\": integer value expected\n",
+			        __FILE__, __LINE__, b);
 			exit(1);
 		}
 		res *= 10;
@@ -492,7 +520,7 @@ int convert_int(char *buf){
 }
 
 int convert_boolean(char *buf){
-	tolower(buf);
+	to_lower(buf);
 
 	if(strcmp("oui",   buf) == 0) return(TRUE);
 	if(strcmp("yes",   buf) == 0) return(TRUE);
@@ -509,7 +537,7 @@ int convert_boolean(char *buf){
 	exit(1);	 
 }
 
-void tolower(char *in){
+void to_lower(char *in){
 	while(*in != 0){
 		if(*in > 64 && *in < 91)*in+=32;
 		in++;

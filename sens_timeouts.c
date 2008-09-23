@@ -1,12 +1,19 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: sens_timeouts.c 87 2006-05-09 07:58:27Z thierry $
+ *
+ */
+
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
 
+#include "arpalert.h"
 #include "data.h"
 #include "sens_timeouts.h"
 #include "log.h"
-#include "config.h"
 #include "loadconfig.h"
 
 /* Taille de la table de hachage (nombre premier) */
@@ -14,7 +21,7 @@
 #define HASH_SIZE 1999
 
 // hash function
-#define sens_timeout_hash(a, b) ( ( (u_char)(a->octet[4]) + (u_char)(a->octet[5]) + \
+#define SENS_TIMEOUT_HASH(a, b) ( ( (u_char)(a->octet[4]) + (u_char)(a->octet[5]) + \
                                 (u_int32_t)(b.ip) ) % HASH_SIZE )
 
 // structurs
@@ -66,11 +73,10 @@ void sens_timeout_init(void) {
 // add new timeout
 void sens_timeout_add(data_mac *mac, data_ip ipb){
 	struct tmouts *new_tmout;
-	struct tmouts *dst_tmout;
-	int h;
+	int hash;
 
 	// get free timeout node
-	if(free_start==NULL){
+	if(free_start == NULL){
 		logmsg(LOG_WARNING, "[%s %d] No authorized request detection timeout avalaible, "
 			"more than %d timeouts currently used",
 			__FILE__, __LINE__, MAX_DATA);
@@ -78,42 +84,21 @@ void sens_timeout_add(data_mac *mac, data_ip ipb){
 	}
 	new_tmout = free_start;
 	free_start = new_tmout->next_chain;
-	
-	new_tmout->mac.octet[0] = mac->octet[0];
-	new_tmout->mac.octet[1] = mac->octet[1];
-	new_tmout->mac.octet[2] = mac->octet[2];
-	new_tmout->mac.octet[3] = mac->octet[3];
-	new_tmout->mac.octet[4] = mac->octet[4];
-	new_tmout->mac.octet[5] = mac->octet[5];
+	data_cpy(&new_tmout->mac, mac);
 	new_tmout->ip_d.ip = ipb.ip;
-	new_tmout->last = time(NULL);
-	new_tmout->prev_hash = NULL;
+	new_tmout->last = current_time;
 	new_tmout->next_hash = NULL;
 	new_tmout->next_chain = NULL;
 
 	// add entrie in hash
-	h = sens_timeout_hash(mac, ipb);
-	dst_tmout = tmout_h[h];
-	
+	hash = SENS_TIMEOUT_HASH(mac, ipb);
 	// find a free space
-	if(dst_tmout == NULL){
-		tmout_h[h] = new_tmout;
-		new_tmout->prev_hash = (struct tmouts *)&tmout_h[h];
-	} else {
-		while(dst_tmout->next_hash != NULL){
-			dst_tmout=dst_tmout->next_hash;
-		}
-		dst_tmout->next_hash = new_tmout;
-		new_tmout->prev_hash = dst_tmout;
-	}
+	new_tmout->next_hash = tmout_h[hash];
+	new_tmout->prev_hash = (struct tmouts *)&tmout_h[hash];
+	tmout_h[hash] = new_tmout;
 
 	// add timeout in chain list
 	if(used_last == NULL){
-		if(used_start != NULL){
-			logmsg(LOG_ERR, "[%s %d] Memory error: state not possible",
-				__FILE__, __LINE__);
-			exit(1);
-		}
 		used_start = new_tmout;
 	} else {
 		used_last->next_chain = new_tmout;
@@ -121,22 +106,18 @@ void sens_timeout_add(data_mac *mac, data_ip ipb){
 	used_last = new_tmout;
 }
 
-// if timeout entrie exist: is not expired
+// check if entrie are in timeout
 int sens_timeout_exist(data_mac *mac, data_ip ipb){
 	int h;
 	struct tmouts *dst_tmout;
 
-	h = sens_timeout_hash(mac, ipb);
+	// if timeout entrie exist: is not expired
+	h = SENS_TIMEOUT_HASH(mac, ipb);
 	dst_tmout = tmout_h[h];
 
 	while(dst_tmout != NULL){
 		if(dst_tmout->ip_d.ip == ipb.ip &&
-		   dst_tmout->mac.octet[0] == mac->octet[0] &&
-		   dst_tmout->mac.octet[1] == mac->octet[1] &&
-		   dst_tmout->mac.octet[2] == mac->octet[2] &&
-		   dst_tmout->mac.octet[3] == mac->octet[3] &&
-		   dst_tmout->mac.octet[4] == mac->octet[4] &&
-		   dst_tmout->mac.octet[5] == mac->octet[5] ){
+		   data_cmp(&dst_tmout->mac, mac)){
 			return(TRUE);
 		}
 		dst_tmout = dst_tmout->next_hash;
@@ -147,27 +128,41 @@ int sens_timeout_exist(data_mac *mac, data_ip ipb){
 // delete timeouts expires
 void sens_timeout_clean(void) {
 	struct tmouts *t_run;
-	time_t time_act;
 
-	time_act = time(NULL);
 	t_run = used_start;
 
 	while(t_run != NULL && 
-	      time_act - t_run->last >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+	      current_time - t_run->last >= config[CF_ANTIFLOOD_INTER].valeur.integer){
+
 		// if previous data is hash base
 		if(t_run->prev_hash >= (struct tmouts *)&tmout_h[0] && 
 		   t_run->prev_hash <= (struct tmouts *)&tmout_h[HASH_SIZE - 1] ){
-			*(struct tmouts **)t_run->prev_hash = t_run->next_hash;
+			// update previous data
+			t_run->prev_hash = t_run->next_hash;
 		} else {
+			// update next data
 			t_run->prev_hash->next_hash = t_run->next_hash;
 		}
+
+		// update next data
 		if(t_run->next_hash != NULL){
 			t_run->next_hash->prev_hash = t_run->prev_hash;
 		}
+
+		// update used_start chain
 		used_start = t_run->next_chain;
-		if(used_start == NULL) used_last = NULL;
+
+		// if used_start is empty, set used_last NULL 
+		if(used_start == NULL) {
+			used_last = NULL;
+		}
+
+		// insert last used at the beginig
+		// of the unused chain
 		t_run->next_chain = free_start;
 		free_start = t_run;
+
+		// get next
 		t_run = used_start;
 	}
 }
