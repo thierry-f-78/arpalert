@@ -15,6 +15,7 @@ int dump = 0;
 
 void miseenforme(char*);
 void miseenmemoire(char*);
+void tolower(char *);
 char lowercase(char);
 int convert_octal(char*);
 int convert_int(char*);
@@ -214,7 +215,7 @@ void config_load(int argc, char *argv[]){
 	strncpy(config[CF_IGNORE_ME].attrib, "ignore me", 512);
 	config[CF_IGNORE_ME].valeur.integer = TRUE;
 	
-	config[CF_UMASK].type = 4;
+	config[CF_UMASK].type = 3;
 	strncpy(config[CF_UMASK].attrib, "umask", 512);
 	config[CF_UMASK].valeur.integer = 0133;
 
@@ -230,11 +231,11 @@ void config_load(int argc, char *argv[]){
 	strncpy(config[CF_IGNORESELFTEST].attrib, "ignore self test", 512);
 	config[CF_IGNORESELFTEST].valeur.integer = TRUE;
 
-	/* load command line parameters for config file */
+	// load command line parameters for config file
 	strncpy(config_file, CONFIG_FILE, 2048);
 	for(i=1; i<argc; i++){
 		if(argv[i][0]=='-' && argv[i][1]=='f'){
-		       	if(i+1 >= argc){
+			if(i+1 >= argc){
 				fprintf(stderr, "Option -f without argument\n");
 				usage();
 			}
@@ -243,6 +244,7 @@ void config_load(int argc, char *argv[]){
 		}
 	}
 
+	// load config file values
 	buf = buffer;
 	fp = fopen(config_file, "r");
 	if(fp == NULL){
@@ -436,7 +438,7 @@ void miseenmemoire(char *buf){
 				case 0: strncpy(config[i].valeur.string, d, 1024); break;
 				case 1: config[i].valeur.integer = convert_int(d); break;
 				case 2: config[i].valeur.integer = convert_boolean(d); break;
-				case 4: config[i].valeur.integer = convert_octal(d); break;
+				case 3: config[i].valeur.integer = convert_octal(d); break;
 			}
 			ok = 1;
 			break;
@@ -444,7 +446,7 @@ void miseenmemoire(char *buf){
 		i++;
 	}
 	if(ok == 0){
-		fprintf(stderr, "%s %i: error in config file at line: \"%s\": parametre innexistant\n",
+		fprintf(stderr, "[%s %i] error in config file at line: \"%s\": parametre innexistant\n",
 			__FILE__, __LINE__, buf);
 		exit(1);
 	}
@@ -459,7 +461,7 @@ int convert_octal(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'7'){
-			fprintf(stderr, "%s %i: error in config file in string \"%s\": octal value expected\n",
+			fprintf(stderr, "[%s %i] error in config file in string \"%s\": octal value expected\n",
 				__FILE__, __LINE__, b);
 			exit(1);
 		}
@@ -478,7 +480,7 @@ int convert_int(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'9'){
-			fprintf(stderr, "%s %i: error in config file in string \"%s\": integer value expected\n",
+			fprintf(stderr, "[%s %i] error in config file in string \"%s\": integer value expected\n",
 				__FILE__, __LINE__, b);
 			exit(1);
 		}
@@ -490,20 +492,28 @@ int convert_int(char *buf){
 }
 
 int convert_boolean(char *buf){
-	char *src;
-	src = buf;
-	*src = lowercase(*src);
-	switch(*src){
-		case 'o': return(TRUE);
-		case 't': return(TRUE);
-		case 'y': return(TRUE);
-		case '1': return(TRUE);
+	tolower(buf);
 
-		case 'n': return(FALSE);
-		case 'f': return(FALSE);
-		case '0': return(FALSE);
+	if(strcmp("oui",   buf) == 0) return(TRUE);
+	if(strcmp("yes",   buf) == 0) return(TRUE);
+	if(strcmp("true",  buf) == 0) return(TRUE);
+	if(strcmp("1",     buf) == 0) return(TRUE);
+	
+	if(strcmp("non",   buf) == 0) return(FALSE);
+	if(strcmp("no",    buf) == 0) return(FALSE);
+	if(strcmp("false", buf) == 0) return(FALSE);
+	if(strcmp("0",     buf) == 0) return(FALSE);
+
+	fprintf(stderr, "[%s %i] error in config file: boolean value expected\n",
+		__FILE__, __LINE__);
+	exit(1);	 
+}
+
+void tolower(char *in){
+	while(*in != 0){
+		if(*in > 64 && *in < 91)*in+=32;
+		in++;
 	}
-	return(FALSE);
 }
 
 char lowercase(char in){
@@ -520,7 +530,7 @@ void miseenforme(char *params){
 	int debut;
 	int space;
 
-        /* suppression des commentaires */
+	// delete comments
 	src = params;
 	protection = 0;
 	while(*src != 0){
@@ -536,7 +546,7 @@ void miseenforme(char *params){
 		src++;
 	}
 
-	/* suppression des espaces inutiles */
+	// delete unused blank characters
 	debut = 0;
 	space = 0;	
 	src = params;
@@ -547,14 +557,14 @@ void miseenforme(char *params){
 		if(*src == '"' || protection == 0xff){
 			*dst = *src;
 			if(*src == '"'){
-				protection ^= 0xff; /* ou  exclusif, inversion de octets pour le flag*/
+				protection = 0x00; 
 			}
 			src++;
 			dst++;
 			continue;
 		}
 
-		/* on ignore les saut de lignes */
+		// ignore end line character
 		if(*src == '\n' || *src == '\r'){
 			src++;
 			continue;
@@ -613,8 +623,8 @@ void miseenforme(char *params){
 			dst--;
 		}
 
-		*src = '=';
 		*(src-1) = ' ';
+		*src     = '=';
 		*(src+1) = ' ';
 	}
 }

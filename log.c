@@ -16,6 +16,20 @@
 #include "loadconfig.h"
 
 FILE *lf;
+const char *mois[12] = {
+	"Jan",
+	"Feb",
+	"Mar",
+	"Apr",
+	"May",
+	"Jun",
+	"Jul",
+	"Aug",
+	"Sep",
+	"Oct",
+	"Nov",
+	"Dec"
+};
 
 void openlogfile(void);
 
@@ -41,6 +55,8 @@ void logmsg(int priority, const char *fmt, ...){
 	va_list ap;
 	char msg[4096];
 	char s_time[128];
+	struct tm *tm;
+	time_t atime;
 
 	/* check if I do log this priority */
 	if(priority > config[CF_LOGLEVEL].valeur.integer)return;
@@ -54,8 +70,17 @@ void logmsg(int priority, const char *fmt, ...){
 	#endif
 
 	if(config[CF_LOGFILE].valeur.string[0] != 0 || config[CF_DAEMON].valeur.integer == FALSE){
-		//Oct  7 12:07:27 localhost arpalert: 
-		snprintf(s_time, 128, "%d: ", (int)time(NULL));
+		//snprintf(s_time, 128, "%d: ", (int)time(NULL));
+		atime = time(NULL);
+		tm=localtime(&atime);
+		snprintf(s_time, 128, "%s % 2d %02d:%02d:%02d arpalert: ",
+			mois[tm->tm_mon],
+			tm->tm_mday,
+			tm->tm_hour,
+			tm->tm_min,
+			tm->tm_sec
+		);
+		//tm->tm_year+1900,
 		va_start(ap, fmt);
 		vsnprintf(msg, 4096, fmt, ap);
 		va_end(ap);

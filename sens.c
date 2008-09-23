@@ -30,8 +30,10 @@
 #define IP_ADRESS_MAX_LEN 15
 #define MASK_MAX_LEN 2
 
-// masks
+// masks 
 #define END_OF_MASKS 0x00000001
+
+// conv binary mask to ip style mask
 const u_int32_t dec_to_bin[33] = {
 	0x00000000,
 	0x80000000,

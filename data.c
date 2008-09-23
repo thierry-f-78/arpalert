@@ -254,15 +254,16 @@ data_pack *data_exist(data_mac *mac){
 	emplacement += data_hash(mac);
 	question = *emplacement;
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Test address 0x%x -> %x",
-               __FILE__, __LINE__, (unsigned int)emplacement, (unsigned int)question);
+	logmsg(LOG_DEBUG, "[%s %i] Test address (%02x:%02x:%02x:%02x:%02x:%02x) hash=0x%x -> data=0x%x",
+               __FILE__, __LINE__, 
+					mac->octet[0], mac->octet[1], mac->octet[2], mac->octet[3], mac->octet[4], mac->octet[5], 
+					(unsigned int)emplacement, (unsigned int)question);
 	#endif
-
 	if(question == NULL)return(NULL);
 
-	while(data_cmp(&((*question).data.mac), mac) == 1){
+	while(data_cmp(&(question->data.mac), mac) == FALSE){
 		if(question->next != NULL){
-			question = (*question).next;
+			question = question->next;
 		} else {
 			return(NULL);
 		}
@@ -280,19 +281,30 @@ unsigned int data_hash(data_mac *mac){
 
 	i = 4;
 	while(i<6){
-		v = (v * HASH_B + mac[0].octet[i]) % HASH_SIZE;
+		v = (v * HASH_B + mac->octet[i]) % HASH_SIZE;
 		i++;
 	}
 	return(v);
 }
 
 u_int data_cmp(data_mac *mac1, data_mac *mac2){
-	if((*mac1).octet[0] != (*mac2).octet[0]) return(FALSE);
-	if((*mac1).octet[1] != (*mac2).octet[1]) return(FALSE);
-	if((*mac1).octet[2] != (*mac2).octet[2]) return(FALSE);
-	if((*mac1).octet[3] != (*mac2).octet[3]) return(FALSE);
-	if((*mac1).octet[4] != (*mac2).octet[4]) return(FALSE);
-	if((*mac1).octet[5] != (*mac2).octet[5]) return(FALSE);
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %i] Compare %08x <=> %08x",
+          __FILE__, __LINE__, mac1, mac2);
+	logmsg(LOG_DEBUG, "[%s %i] Compare %02x:%02x:%02x:%02x:%02x:%02x <=> %02x:%02x:%02x:%02x:%02x:%02x",
+          __FILE__, __LINE__, 
+          mac1->octet[0], mac1->octet[1], mac1->octet[2], mac1->octet[3], mac1->octet[4], mac1->octet[5],
+          mac2->octet[0], mac2->octet[1], mac2->octet[2], mac2->octet[3], mac2->octet[4], mac2->octet[5]);
+	#endif
+	if(mac1->octet[0] != mac2->octet[0]) return(FALSE);
+	if(mac1->octet[1] != mac2->octet[1]) return(FALSE);
+	if(mac1->octet[2] != mac2->octet[2]) return(FALSE);
+	if(mac1->octet[3] != mac2->octet[3]) return(FALSE);
+	if(mac1->octet[4] != mac2->octet[4]) return(FALSE);
+	if(mac1->octet[5] != mac2->octet[5]) return(FALSE);
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG, "[%s %i] Return TRUE", __FILE__, __LINE__);
+	#endif
 	return(TRUE);
 }
 

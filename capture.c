@@ -72,7 +72,7 @@ void cap_init(void){
 	struct sockaddr_dl *sdl;
 	#endif
 
-	/* recherche le premier device deisponoible */
+	// find first usable device
 	device = NULL;
 
 	if(config[CF_IF].valeur.string[0] != 0){
@@ -91,7 +91,7 @@ void cap_init(void){
 		device=NULL;
 	}
 
-	/* fiond my arp adresses */
+	// find my arp adresses for this device
 	strncpy(filtre, FILTER, 1024);
 
 	if(config[CF_IGNORE_ME].valeur.integer == TRUE){
@@ -153,12 +153,14 @@ void cap_init(void){
 		strncat(filtre, ethernet, 1024);
 	}
 	
-	/* initialise l'interface */
+	// promiscuous mode ?
 	if(config[CF_PROMISC].valeur.integer==TRUE){
 		promisc = 1;
 	} else {
 		promisc = 0;
 	}
+	
+	// interface initialization 
 	if((idcap = pcap_open_live(device, SNAP_LEN, promisc, 0, err)) == NULL){
 		logmsg(LOG_ERR, "[%s %i] pcap_open_live error: %s", __FILE__, __LINE__, err);
 		exit(1);

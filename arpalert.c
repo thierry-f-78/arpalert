@@ -35,9 +35,6 @@ int dumptime = 0;
 int nettoyage = 0;
 
 int main(int argc, char **argv){
-	// copie command line parameters
-	margc = argc;
-	margv = argv;
 	flagdump = TRUE;
 	
 	/* va lire le fichier de configuration */
@@ -123,7 +120,7 @@ void dumpmaclist(int signal){
 		dumptime = time(NULL);
 	}
 
-	/* nettoyage toutes les 5 minutes */
+	/* nettoyage toutes les minutes */
 	if((time(NULL) - nettoyage) >= 60){
 		data_clean(config[CF_TOOOLD].valeur.integer);
 		nettoyage = time(NULL);

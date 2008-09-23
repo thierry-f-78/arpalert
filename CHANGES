@@ -1,3 +1,6 @@
+0.4.15: bugfix: probleme in function data_cmp
+        rewrite many parts of code.
+
 0.4.14: Anti flood system for unauthorized detection by couple 
         mac sender / ip requested. This system permit to watch all alerts.
         Anti flood system only by mac sender is also available.

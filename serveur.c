@@ -64,7 +64,7 @@ void separe(void){
 		exit(1);
 	}
 	if(lockf(fd, F_TLOCK, 0)<0){
-		logmsg(LOG_ERR, "[%s %i] daemon already running", __FILE__, __LINE__);
+		logmsg(LOG_ERR, "[%s %i] daemon instance already running", __FILE__, __LINE__);
 		exit(1);
 	}
 	snprintf(str, 12, "%d\n", getpid());
