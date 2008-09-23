@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: tool_code.sh 667 2007-11-17 14:26:13Z  $
+# $Id: tool_code.sh 684 2008-03-28 18:01:29Z  $
 #
 
 case $1 in
@@ -12,7 +12,7 @@ case $1 in
 	stats)
 		for files in *.c *.h; do
 			printf "%15s:% 5d lines\n" $files "$( cat $files | wc -l )"
-		done | sort -n +1
+		done | sort -n -k 1
 		echo
 		printf "%15s:% 5d lines\n" "Total" "$( ( cat *.c ; cat *.h ) | wc -l )"
 		;;

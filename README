@@ -1,3 +1,6 @@
+# pour AIX
+CC=/usr/vac/bin/gxlc CFLAG=-I/home/x047400/ ./configure
+
 # a trduire
 
 Les options de la ligne de commande

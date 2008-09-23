@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: func_str.c 667 2007-11-17 14:26:13Z  $
+ * $Id: func_str.c 684 2008-03-28 18:01:29Z  $
  *
  */
 
@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <net/if_arp.h>
 #include <net/if.h>
+#include <net/if_arp.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 #if (__NetBSD__ || __FreeBSD__ || __OpenBSD__)

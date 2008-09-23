@@ -1,3 +1,9 @@
+2.0.10  * info<at>arpalert<dot>org
+          bug into leases file reading
+          new script in contribs by mikuskuikku
+          (found here: http://ubuntuforums.org/showthread.php?t=464883)
+			 this script send a zenity alert on Ubuntu.
+
 2.0.9   * info<at>arpalert<dot>org
           fix an error message
           update script API documentation

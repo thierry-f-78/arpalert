@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 667 2007-11-17 14:26:13Z  $
+ * $Id: data.c 684 2008-03-28 18:01:29Z thierry $
  *
  */
 
@@ -324,6 +324,10 @@ struct data_pack *data_add(struct ether_addr *mac, int status,
 	#ifdef DEBUG 
 	char buf[MAC_SIZE];
 	#endif
+
+	add = data_exist(mac, idcap);
+	if (add != NULL)
+		return add;
 
 	if(data_size >= config[CF_MAXENTRY].valeur.integer){
 		logmsg(LOG_ERR, "memory up to %i entries: flushing data",

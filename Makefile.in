@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile.in 667 2007-11-17 14:26:13Z  $
+# $Id: Makefile.in 684 2008-03-28 18:01:29Z thierry $
 # 
 
 prefix = @prefix@
@@ -24,9 +24,10 @@ includedir = @includedir@
 src_dir = .
 
 CC = @CC@
-CFLAGS = -Wall -O2  \
-         -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" \
-         -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
+CFLAGS += @CFLAGS@ \
+          -Wall -O2  \
+          -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" \
+          -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
 LDFLAGS = -Wl,--export-dynamic
 LIBS = @LIBS@
 OBJECT_LIST = \
