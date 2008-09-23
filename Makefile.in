@@ -1,0 +1,89 @@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+libexecdir = @libexecdir@
+datadir = @datadir@
+sysconfdir = @sysconfdir@
+sharedstatedir = @sharedstatedir@
+localstatedir = @localstatedir@
+libdir = @libdir@
+infodir = @infodir@
+mandir = @mandir@
+includedir = @includedir@
+CC = @CC@
+FLAGS = -Wall -pedantic
+
+config_dir = @sysconfdir@/arpalert
+leases_dir = @localstatedir@/lib/arpalert
+lock_dir = @localstatedir@/run
+
+
+LIBS = @LIBS@
+OBJECT_LIST = \
+	obj/arpalert.o \
+	obj/loadconfig.o \
+	obj/log.o \
+	obj/data.o \
+	obj/maclist.o \
+	obj/serveur.o \
+	obj/alerte.o \
+	obj/capture.o
+
+#DEFS = -DCONFIG_FILE=\"@sysconfdir@/arpalert/arpalert.conf\"
+DEFS = -DCONFIG_FILE=\"${config_dir}/arpalert.conf\" -DPID_FILE=\"${lock_dir}/run/arpalert.pid\"
+
+arpalert: ${OBJECT_LIST}
+	${CC} ${FLAGS} -g -O2 -o obj/arpalert ${OBJECT_LIST} ${FLAGS} ${LIBS} ${DEFS}
+
+obj/log.o: log.c log.h config.h
+	${CC} ${FLAGS} -c -o obj/log.o log.c ${DEFS}
+
+obj/loadconfig.o: loadconfig.c loadconfig.h config.h
+	${CC} ${FLAGS} -c -o obj/loadconfig.o loadconfig.c ${DEFS}
+
+obj/arpalert.o: arpalert.c config.h
+	${CC} ${FLAGS} -c -o obj/arpalert.o arpalert.c ${DEFS}
+
+obj/data.o: data.c data.h config.h
+	${CC} ${FLAGS} -c -o obj/data.o data.c ${DEFS}
+
+obj/maclist.o: maclist.c maclist.h config.h
+	${CC} ${FLAGS} -c -o obj/maclist.o maclist.c ${DEFS}
+
+obj/serveur.o: serveur.c serveur.h config.h
+	${CC} ${FLAGS} -c -o obj/serveur.o serveur.c ${DEFS}
+
+obj/capture.o: capture.c capture.h config.h
+	${CC} ${FLAGS} -c -o obj/capture.o capture.c ${DEFS}
+
+obj/alerte.o: alerte.c alerte.h config.h
+	${CC} ${FLAGS} -c -o obj/alerte.o alerte.c ${DEFS}
+
+clean:
+	rm -f *~ *.o
+	rm -f obj/*
+	rm -f config.log
+	rm -f config.status
+
+install:
+	mkdir -p ${sbindir}
+	mkdir -p ${leases_dir}
+	mkdir -p ${lock_dir}
+	mkdir -p ${config_dir}	
+	cp obj/arpalert ${sbindir}
+	test ! -f ${config_dir}/maclist.allow && > ${config_dir}/maclist.allow || /bin/true
+	test ! -f ${config_dir}/maclist.deny  && > ${config_dir}/maclist.deny  || /bin/true
+	if test ! -f ${config_dir}/arpalert.conf; \
+	then \
+		> ${config_dir}/arpalert.conf; \
+		echo "Maclist file                    = ${config_dir}/maclist.allow" >> ${config_dir}/arpalert.conf; \
+		echo "Maclist alert file              = ${config_dir}/maclist.deny" >> ${config_dir}/arpalert.conf; \
+		echo "Maclist leases file             = ${leases_dir}/arpalert.leases" >> ${config_dir}/arpalert.conf; \
+		echo >> ${config_dir}/arpalert.conf; \
+		echo "Lock file                       = ${lock_dir}/arpalert.lock" >> ${config_dir}/arpalert.conf; \
+		cat etc/arpalert.conf.in  >> ${config_dir}/arpalert.conf; \
+	else \
+		/bin/true; \
+	fi
+

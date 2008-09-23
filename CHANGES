@@ -1,0 +1,8 @@
+0.4.0: More configuration option added
+       Many bugs patched
+       Security fail patched
+
+03b: FUNCTION: the use of autoconf / automake is now avalaible
+03b: BUG: The soft not inform th user when the config file is not accessible.
+
+02b: FUNCTION: The config is choosable by the command line (-f /config/file)

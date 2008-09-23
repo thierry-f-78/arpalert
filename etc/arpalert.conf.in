@@ -1,0 +1,24 @@
+log level 			= 6
+
+#Action on detect		= "/root/test.sh"
+#Action on detect		= "/root/test2.sh"
+Execution timeout		= 10
+max alert			= 15
+Max request			= 50
+
+Dump black list			= FALSE
+Dump white list			= FALSE
+Dump new address		= TRUE
+
+Mac timeout			= 88888888888830
+Max entry               	= 100
+
+log referenced address		= FALSE
+alert on referenced address	= FALSE
+log deny address		= TRUE
+alert on deny address		= TRUE
+log new address			= TRUE
+alert on new address		= TRUE
+log ip change			= TRUE
+alert on ip change      	= TRUE
+

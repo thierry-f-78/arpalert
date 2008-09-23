@@ -1,0 +1,5 @@
+#undef DEBUG
+#undef DEBUG_MALLOC
+#undef USE_SYSLOG
+/* #undef CONFIG_FILE */
+
