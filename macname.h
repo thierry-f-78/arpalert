@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: macname.h 375 2006-10-25 18:34:38Z  $
+ * $Id: macname.h 450 2006-11-24 10:33:55Z  $
  *
  */
 

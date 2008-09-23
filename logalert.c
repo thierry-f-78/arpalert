@@ -2,19 +2,7 @@
 
 #include "log.h"
 #include "loadconfig.h"
-
-const char *alert_type[] = {
-	"ip_change",
-	"unknow_address",
-	"black_listed",
-	"new",
-	"unauthrq",
-	"rqabus",
-	"mac_error",
-	"flood",
-	"new_mac",
-	"mac_change"
-};
+#include "alertes.h"
 
 void alerte_log(int num_seq,
                 char *mac_sender,
@@ -27,10 +15,10 @@ void alerte_log(int num_seq,
 	// log with mac vendor
 	if(config[CF_LOG_VENDOR].valeur.integer == TRUE){
 		switch(type){
-			case 0:
-			case 4:
-			case 6:
-			case 9:
+			case AL_IP_CHANGE:
+			case AL_UNAUTHRQ:
+			case AL_MAC_ERROR:
+			case AL_MAC_CHANGE:
 				logmsg(LOG_NOTICE,
 				       "seq=%d, mac=%s, ip=%s, reference=%s, "
 				       "type=%s, dev=%s, vendor=\"%s\"",
@@ -51,10 +39,10 @@ void alerte_log(int num_seq,
 	// log whitout mac vendor
 	else {
 		switch(type){
-			case 0:
-			case 4:
-			case 6:
-			case 9:
+			case AL_IP_CHANGE:
+			case AL_UNAUTHRQ:
+			case AL_MAC_ERROR:
+			case AL_MAC_CHANGE:
 				logmsg(LOG_NOTICE,
 				       "seq=%d, mac=%s, ip=%s, reference=%s, "
 				       "type=%s, dev=%s",

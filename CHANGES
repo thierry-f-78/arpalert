@@ -1,3 +1,13 @@
+2.0.3   * Jan Wagner waja<at>cyconet<dot>org
+BETA      man corrections
+        * info<at>arpalert<dot>org 
+          arpalert don't quit if the leases file is not found
+			        at start. just send an notice.
+          variable type correction					  
+          alerts identifiers defined
+          alert bug in "reference" field
+          put also mac address without ip in leases file
+
 2.0.2   * info<at>arpalert<dot>org
 BETA      serialization of sigchld signal and sigkill, sighup
           option for force run in foreground

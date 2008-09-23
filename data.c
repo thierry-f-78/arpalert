@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 420 2006-11-04 10:56:02Z  $
+ * $Id: data.c 450 2006-11-24 10:33:55Z thierry $
  *
  */
 
@@ -417,7 +417,7 @@ void data_dump(void){
 		while(dump != base){
 			// dump
 			if( ( dump_mask & dump->flag) != 0 ){
-				if(dump->ip.s_addr != 0){
+				//if(dump->ip.s_addr != 0){
 					len = snprintf(msg, 128,
 					               "%02x:%02x:%02x:%02x:%02x:%02x %s %s %u %u\n",
 					               dump->mac.ETHER_ADDR_OCTET[0],
@@ -431,7 +431,7 @@ void data_dump(void){
 										(unsigned int)dump->timestamp.tv_sec,
 										(unsigned int)dump->timestamp.tv_usec);
 					write(fp, msg, len);
-				}
+				//}
 			}
 
 			// get next data

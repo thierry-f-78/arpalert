@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: arpalert.conf.in 384 2006-10-27 09:32:12Z  $
+# $Id: arpalert.conf.in 450 2006-11-24 10:33:55Z thierry $
 # 
 # Default config file
 # 

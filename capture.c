@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 420 2006-11-04 10:56:02Z  $
+ * $Id: capture.c 450 2006-11-24 10:33:55Z thierry $
  *
  */
 
@@ -50,6 +50,7 @@
 #include "macname.h"
 #include "func_time.h"
 #include "func_str.h"
+#include "alertes.h"
 
 #define SNAP_LEN 1514
 
@@ -75,7 +76,7 @@ struct timeval next_abus_reset;
 struct capt *first_capt;
 
 // persistent var
-int seq = 0;
+unsigned int seq = 0;
 int abus = 50;
 int base = 21;
 int count = 0;
@@ -91,16 +92,16 @@ U_INT32_T log_bitfield;
 // convert alert flag to alert number
 int flag_to_no(U_INT32_T flag){
 	switch(flag){
-		case FLAG_IPCHG:     return 0; break;
-		case FLAG_ALLOW:     return 1; break;
-		case FLAG_DENY:      return 2; break;
-		case FLAG_NEW:       return 3; break;
-		case FLAG_UNAUTH_RQ: return 4; break;
-		case FLAG_ABUS:      return 5; break;
-		case FLAG_BOGON:     return 6; break;
-		case FLAG_FLOOD:     return 7; break;
-		case FLAG_NEWMAC:    return 8; break;
-		case FLAG_MACCHG:    return 9; break;
+		case FLAG_IPCHG:     return AL_IP_CHANGE;       break;
+		case FLAG_ALLOW:     return AL_UNKNOWN_ADDRESS; break;
+		case FLAG_DENY:      return AL_BLACK_LISTED;    break;
+		case FLAG_NEW:       return AL_NEW;             break;
+		case FLAG_UNAUTH_RQ: return AL_UNAUTHRQ;        break;
+		case FLAG_ABUS:      return AL_RQABUS;          break;
+		case FLAG_BOGON:     return AL_MAC_ERROR;       break;
+		case FLAG_FLOOD:     return AL_FLOOD;           break;
+		case FLAG_NEWMAC:    return AL_NEW_MAC;         break;
+		case FLAG_MACCHG:    return AL_MAC_CHANGE;      break;
 	}
 	return -1;
 }
@@ -470,8 +471,8 @@ void send_alert(struct ether_addr *mac_sender,
 	// convert alert flag into alert number
 	alert_no = flag_to_no(flag);
 
-	if((alert_bitfield & flag) != 0x000000 ||
-	   (log_bitfield & flag) != 0x000000){
+	if((alert_bitfield & flag) != 0x00000000 ||
+	   (log_bitfield & flag) != 0x00000000){
 
 		// convert eth mac sender to string
 		MAC_TO_STR(*mac_sender, &str_eth_mac_sender[0]);
@@ -481,13 +482,13 @@ void send_alert(struct ether_addr *mac_sender,
 
 		// convert references
 	   switch(alert_no){
-	      case 0:
-	      case 4:
+	      case AL_IP_CHANGE:
+	      case AL_UNAUTHRQ:
 				strcpy(str_ref, inet_ntoa(ref_ip));
 				break;
 
-	      case 6:
-	      case 9:
+	      case AL_MAC_ERROR:
+	      case AL_FLOOD:
 				MAC_TO_STR(*ref_mac, str_ref);
 				break;
 
@@ -498,26 +499,32 @@ void send_alert(struct ether_addr *mac_sender,
 	}
 
 	// get vendor
-	vendor = get_vendor(mac_sender);
+	if(config[CF_LOG_VENDOR].valeur.integer == TRUE){
+		vendor = get_vendor(mac_sender);
+	}
+
+	else {
+		vendor = NULL;
+	}
 
 
 	// send alert script
-	if((alert_bitfield & flag) != 0x000000){
+	if((alert_bitfield & flag) != 0x00000000){
 		alerte_script(str_eth_mac_sender, str_arp_ip_sender, alert_no,
 		              str_ref, interface, vendor); 
 	}
 
 	// send alert module
-	if((mod_bitfield & flag) != 0x000000){
+	if((mod_bitfield & flag) != 0x00000000){
 		alerte_mod(mac_sender, ip_sender, alert_no,
 		           ref_mac, ref_ip, interface, vendor);
 	}
 
 	// send alert log
-	if((log_bitfield & flag) != 0x000000){
+	if((log_bitfield & flag) != 0x00000000){
 		alerte_log(seq,
 		           str_eth_mac_sender, str_arp_ip_sender,
-		           alert_no, NULL, interface, vendor);
+		           alert_no, str_ref, interface, vendor);
 	}
 }
 
@@ -574,12 +581,10 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 	eth_header = (struct ether_header *)buff;
 
 	// get a ethernet mac source
-	// eth_mac_sender = (struct ether_addr *)&(eth_header->ether_shost);
 	memcpy(&__eth_mac_sender, &(eth_header->ether_shost), 6);
 	eth_mac_sender = &__eth_mac_sender;
 
 	// get a ethernet mac dest
-	//eth_mac_rcpt = (struct ether_addr *)&(eth_header->ether_dhost);
 	memcpy(&__eth_mac_rcpt, &(eth_header->ether_dhost), 6);
 	eth_mac_rcpt = &__eth_mac_rcpt;
 
@@ -620,7 +625,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		                sizeof(struct arphdr));
 
 		// get arp mac sender
-		//arp_mac_sender = (struct ether_addr *)arp_data_base;
 		memcpy(&__arp_mac_sender, arp_data_base, arp_header->ar_hln);
 		arp_mac_sender = &__arp_mac_sender;
 
@@ -628,7 +632,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		arp_data_base += arp_header->ar_hln;
 
 		// get ip of arp sender
-		//arp_ip_sender.s_addr = *(U_INT32_T *)arp_data_base;
 		memcpy(&arp_ip_sender.s_addr, arp_data_base, arp_header->ar_pln);
 	
 		// base = target mac address
@@ -642,7 +645,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		arp_data_base += arp_header->ar_hln;
 		
 		// get ip of arp rcpt
-		//arp_ip_rcpt.s_addr = *(U_INT32_T *)arp_data_base;
 		memcpy(&arp_ip_rcpt.s_addr, arp_data_base, arp_header->ar_pln);
 
 		if(config[CF_DUMP_PAQUET].valeur.integer == TRUE){
@@ -876,15 +878,16 @@ void callback(u_char *user, const struct pcap_pkthdr *h,
 		eth_data->lastalert[0].tv_sec = current_t.tv_sec;
 		eth_data->lastalert[0].tv_usec = current_t.tv_usec;
 					
-		// maj database
-		eth_data->ip.s_addr = arp_ip_sender.s_addr;
-		index_ip(eth_data);
-
 		// can dump database
 		data_rqdump();
 	
 		send_alert(eth_mac_sender, arp_ip_sender, FLAG_IPCHG,
 		           &null_mac, eth_data->ip, cap_id->device);
+
+		// maj database
+		eth_data->ip.s_addr = arp_ip_sender.s_addr;
+		index_ip(eth_data);
+
 	}
 
 	// =====================================

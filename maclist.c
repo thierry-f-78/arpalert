@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: maclist.c 420 2006-11-04 10:56:02Z  $
+ * $Id: maclist.c 450 2006-11-24 10:33:55Z thierry $
  *
  */
 
@@ -68,6 +68,14 @@ int maclist_file(char *file_name, int level, int mode){
 	// open file
 	file = fopen(file_name, "r");
 	if(file == NULL){
+		// the leases file is not found ...
+		// maybe does not exist. is not an error
+		// just log
+		if(errno == ENOENT && level == APPEND){
+			logmsg(LOG_NOTICE, "Leases file (%s) not found",
+			       file_name);
+			return 0;
+		}
 		logmsg(LOG_ERR, "[%s %d] fopen[%d]: %s (%s)",
 		       __FILE__, __LINE__,
 		       errno, strerror(errno),
@@ -245,6 +253,7 @@ int maclist_file(char *file_name, int level, int mode){
 void maclist_load(void){
 	int retval;
 	
+	// load white list
 	if(config[CF_MACLIST].valeur.string != NULL &&
 	   config[CF_MACLIST].valeur.string[0] != 0){
 		retval = maclist_file(config[CF_MACLIST].valeur.string,
@@ -254,6 +263,7 @@ void maclist_load(void){
 		}
 	}
 
+	// load black list
 	if(config[CF_BLACKLST].valeur.string != NULL &&
 	   config[CF_BLACKLST].valeur.string[0] != 0){
 		retval = maclist_file(config[CF_BLACKLST].valeur.string,
@@ -263,6 +273,7 @@ void maclist_load(void){
 		}
 	}
 
+	// load leases
 	if(config[CF_LEASES].valeur.string != NULL &&
 	   config[CF_LEASES].valeur.string[0] != 0){
 		retval = maclist_file(config[CF_LEASES].valeur.string,
