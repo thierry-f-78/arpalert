@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: func_time.h 667 2007-11-17 14:26:13Z  $
+ *
+ */
+
 #ifndef __FUNC_TIME_H__
 #define __FUNC_TIME_H__
 

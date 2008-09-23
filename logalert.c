@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: logalert.c 667 2007-11-17 14:26:13Z  $
+ *
+ */
+
 #include "config.h"
 
 #include "log.h"

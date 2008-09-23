@@ -1,6 +1,6 @@
 .\"
 .\" Copyright (c) 2005-2010 Thierry FOURNIER
-.\" $Id: arpalert.8 578 2007-08-27 13:57:26Z thierry $
+.\" $Id: arpalert.8 667 2007-11-17 14:26:13Z  $
 .\"
 .TH ARPALERT 8 2006-05-09 "" "arp traffic monitoring"
 .SH NAME
@@ -27,6 +27,9 @@ The level logged. The levels are between 0 (emergency) and 7 (debug). If 3 is se
 .TP
 \fB\-l leases_file\fR
 This file contain a dump of the mac address in memory (see config file).
+.TP
+\fB\-m module file\fR
+Specify a module file to load
 .TP
 \fB\-d\fR
 Run as daemon.
@@ -128,7 +131,19 @@ This system permit to avoid a costly fork/exec
 This chain is transfered to the init function of module loaded
 .TP
 \fBaction on detect\fR = ""
-Script launched on each detection. Parameters are: \fBmac address of requestor\fR, \fBip of requestor\fR, \fBsupp. parm.\fR, \fBtype of alert\fR
+Script launched on each detection. Parameters are: 
+.br
+ - \fBmac address of requestor\fR,
+.br
+ - \fBip of requestor\fR,
+.br
+ - \fBsupp. parm.\fR,
+.br
+ - \fBethernet device listening on\fR
+.br
+ - \fBtype of alert\fR,
+.br
+ - optional: \fBethernet vendor\fR
 .IP
 type of alert:
 .br

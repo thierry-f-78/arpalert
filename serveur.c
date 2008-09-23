@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.c 578 2007-08-27 13:57:26Z thierry $
+ * $Id: serveur.c 667 2007-11-17 14:26:13Z  $
  *
  */
 
@@ -87,24 +87,28 @@ void separe(void){
 	int fd;
 
 	// open lock/pid file
-	fd = open(config[CF_LOCKFILE].valeur.string, O_RDWR|O_CREAT, 0640);
-	if(fd < 0){
-		logmsg(LOG_ERR, "[%s %i] CF_LOCKFILE open(\"%s\")[%d]: %s",
-		       __FILE__, __LINE__, config[CF_LOCKFILE].valeur.string, errno, strerror(errno));
-		exit(1);
-	}
+	if ( config[CF_LOCKFILE].valeur.string != NULL &&
+	     config[CF_LOCKFILE].valeur.string[0] != 0 ) {
+
+		fd = open(config[CF_LOCKFILE].valeur.string, O_RDWR|O_CREAT, 0640);
+		if(fd < 0){
+			logmsg(LOG_ERR, "[%s %i] CF_LOCKFILE open(\"%s\")[%d]: %s",
+			       __FILE__, __LINE__, config[CF_LOCKFILE].valeur.string, errno, strerror(errno));
+			exit(1);
+		}
 	
-	// lock file during program execution
-	if(lockf(fd, F_TLOCK, 0)<0){
-		logmsg(LOG_ERR,
-		       "daemon instance already running (file: %s locked)",
-		       config[CF_LOCKFILE].valeur.string);
-		exit(1);
-	}
+		// lock file during program execution
+		if(lockf(fd, F_TLOCK, 0)<0){
+			logmsg(LOG_ERR,
+			       "daemon instance already running (file: %s locked)",
+			       config[CF_LOCKFILE].valeur.string);
+			exit(1);
+		}
 	
-	// write pid in lock file
-	snprintf(str, 8, "%d\n", (int)getpid());
-	write(fd, str, strlen(str));
+		// write pid in lock file
+		snprintf(str, 8, "%d\n", (int)getpid());
+		write(fd, str, strlen(str));
+	}
 
 	// privilege separation
 	if(config[CF_USER].valeur.string != NULL && 
@@ -112,13 +116,19 @@ void separe(void){
 
 		// get uid and gid by username 
 		pwd = getpwnam(config[CF_USER].valeur.string);
-		if(pwd == NULL){
-			if(errno == 0){
-				logmsg(LOG_ERR, "[%s %i] getpwnam: name \"%s\" not found",
-				       __FILE__, __LINE__, config[CF_USER].valeur.string);
+		if (pwd == NULL) {
+			if (errno == EINTR ||
+			    errno == EIO ||
+			    errno == EMFILE ||
+			    errno == ENFILE ||
+			    errno == ENOMEM ||
+			    errno == ERANGE) {
+				logmsg(LOG_ERR, "[%s %i] getpwnam(%s): %s",
+				       __FILE__, __LINE__, config[CF_USER].valeur.string,
+				       strerror(errno));
 			} else {
-				logmsg(LOG_ERR, "[%s %i] getpwnam[%d]: %s",
-				       __FILE__, __LINE__, errno, strerror(errno));
+				logmsg(LOG_ERR, "[%s %i] getpwnam: user \"%s\" not found",
+				       __FILE__, __LINE__, config[CF_USER].valeur.string);
 			}
 			exit(1);
 		}

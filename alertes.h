@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2005-2010 Thierry FOURNIER
+ * $Id: alertes.h 667 2007-11-17 14:26:13Z  $
+ *
+ */
+
 #ifndef __ALERTES_H__
 #define __ALERTES_H__
 

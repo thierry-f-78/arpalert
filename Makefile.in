@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile.in 578 2007-08-27 13:57:26Z thierry $
+# $Id: Makefile.in 667 2007-11-17 14:26:13Z  $
 # 
 
 prefix = @prefix@
@@ -27,6 +27,7 @@ CC = @CC@
 CFLAGS = -Wall -O2  \
          -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" \
          -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
+LDFLAGS = -Wl,--export-dynamic
 LIBS = @LIBS@
 OBJECT_LIST = \
 	$(src_dir)/arpalert.o \
@@ -106,7 +107,7 @@ serveur.o: serveur.c serveur.h config.h log.h loadconfig.h
 	$(CC) $(CFLAGS) -c -o serveur.o $(src_dir)/serveur.c
 
 build_module_example:
-	-@cd module_example; make; cd ..
+	@cd module_example; make; cd ..
 
 mrproper: clean
 	-@rm -rf arpalert-sources.pdf autom4te.cache configure Makefile \

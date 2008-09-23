@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: arpalert.conf.in 578 2007-08-27 13:57:26Z thierry $
+# $Id: arpalert.conf.in 667 2007-11-17 14:26:13Z  $
 # 
 # Default config file
 # 
@@ -35,7 +35,7 @@ user = arpalert
 # rights for file creation
 umask = 177
 
-# only for debugging: this dump paquet received on standard outpu
+# only for debugging: this dump paquet received on standard output
 dump packet = false
 
 # run the program as daemon ?
@@ -55,7 +55,13 @@ catch only arp = true
 #interface = eth0
 
 # script launched on each detection
-# parameters are: "mac adress of requestor" "ip of requestor" "supp. parm." "type of alert"
+# parameters are:
+#  - "mac adress of requestor"
+#  - "ip of requestor"
+#  - "supp. parm."
+#  - "ethernet device listening on"
+#  - "type of alert"
+#  - optional : "ethernet vendor"
 # type of alert:
 # 0: ip change
 # 1: mac address only detected but not in whithe list

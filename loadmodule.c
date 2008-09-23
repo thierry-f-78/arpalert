@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadmodule.c 578 2007-08-27 13:57:26Z  $
+ * $Id: loadmodule.c 667 2007-11-17 14:26:13Z  $
  *
  */
 
@@ -88,6 +88,9 @@ void module_load(void){
 
 	// module initialisation call
 	if(mod_load != NULL) mod_load(config[CF_MOD_CONFIG].valeur.string);
+
+	// can not modify config
+	set_end_of_conf();
 }
 
 // unload and close module

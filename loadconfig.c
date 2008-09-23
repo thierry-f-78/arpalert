@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 578 2007-08-27 13:57:26Z thierry $
+ * $Id: loadconfig.c 667 2007-11-17 14:26:13Z  $
  *
  */
 
@@ -27,6 +27,7 @@ char lowercase(char);
 int convert_octal(char*);
 int convert_int(char*);
 int convert_boolean(char*);
+int end_of_conf = 0;
 
 void usage(){
 	printf(
@@ -779,3 +780,37 @@ void miseenforme(char *params){
 	}
 }
 
+void set_end_of_conf(void) {
+	end_of_conf = 1;
+}
+
+void set_option(int opt, void *value) {
+	if ( end_of_conf == 1 ) {
+		logmsg(LOG_ALERT, "can not modify config");
+		return;
+	}
+
+	// check for unauthorized options
+	switch (opt) {
+		case CF_MOD_ALERT:
+		case CF_MOD_CONFIG:
+		case CF_USESYSLOG:
+		case CF_LOGFILE:
+			logmsg(LOG_ALERT, "can not modify config option %d", opt);
+			return;
+	}
+
+	switch ( config[opt].type ) {
+		case 0:
+			if ( value == NULL ) {
+				config[opt].valeur.string = NULL;
+			} else {
+				config[opt].valeur.string = strdup((char *)value);
+			}
+			break;
+		case 1:
+		case 2:
+			config[opt].valeur.integer = (int)value;
+			break;
+	}
+}

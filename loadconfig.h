@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.h 578 2007-08-27 13:57:26Z thierry $
+ * $Id: loadconfig.h 667 2007-11-17 14:26:13Z  $
  *
  */
 
@@ -129,5 +129,8 @@ char config_file[CONFIGFILE_LEN];
 
 // load config file values
 void config_load(int, char **);
+
+// can not modify config
+void set_end_of_conf(void);
 
 #endif

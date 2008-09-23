@@ -1,6 +1,14 @@
+2.0.9   * info<at>arpalert<dot>org
+          fix an error message
+          update script API documentation
+          API documentation
+          new API functions : mod conf
+          set lockfile optional
+
 2.0.8   * info<at>arpalert<dot>org
           install API include
           close and reopen the logfile on sighup
+          add graphic module
           change type of ip arg passed to module
           bug with module options
 
@@ -10,6 +18,7 @@
           check string representation of mac adress memory size
           allocate static memory for many buffers
           openbsd Makefile compatibility
+          little error in Makefile.in
 
 2.0.6   * info<at>arpalert<dot>org
           default config file syntax correction and comments
