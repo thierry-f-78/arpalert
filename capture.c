@@ -43,7 +43,6 @@ void cap_snif(void){
 	int promisc;
 	int sock_fd;
 	struct ifreq ifr;
-	int retour_cap;
 
 	/* recherche le premier device deisponoible */
 	device = NULL;
@@ -88,9 +87,9 @@ void cap_snif(void){
 		me.octet[4] = ifr.ifr_addr.sa_data[4];
 		me.octet[5] = ifr.ifr_addr.sa_data[5];
 
-		data_tomac(me, ethernet);
+		data_tomac(me, (unsigned char *)ethernet);
 		strncat(filtre, " not ether host ", 1024);
-		strncat(filtre, ethernet , 1024);
+		strncat(filtre, ethernet, 1024);
 	}
 	
 	/* initialise l'interface */

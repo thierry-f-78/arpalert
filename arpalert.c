@@ -88,6 +88,7 @@ void die(int signal){
 
 void loadconfig(int signal){
 	maclist_reload();
+	sens_reload();
 }
 
 void dumpmaclist(int signal){

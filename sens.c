@@ -166,6 +166,11 @@ void sens_free(void){
 	}
 }
 
+void sens_reload(void){
+	sens_free();
+	sens_init();
+}
+
 int sens_exist(data_mac *mac, data_ip ipb){
 		int h;
 		struct pqt *spqt;
