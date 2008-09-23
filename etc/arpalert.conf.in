@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: arpalert.conf.in 139 2006-09-01 21:53:38Z thierry $
+# $Id: arpalert.conf.in 223 2006-10-05 19:44:46Z thierry $
 # 
 # Default config file
 # 
@@ -23,12 +23,17 @@ dump paquet = false
 # run the program as daemon ?
 daemon = false
 
+#Configure the network for catch only arp request.
+#The detection type "new_mac" is desactived.
+#This mode is used for CPU saving if Arpalert is running on a router
+catch only arp = true
+
 # lesson this interface 
 # if not precised, the soft select the first interface.
 # by default select the first interface encontered
 #interface = eth0
 
-# script launch on each detection
+# script launched on each detection
 # parameters are: "mac adress of requestor" "ip of requestor" "supp. parm." "type of alert"
 # type of alert:
 # 0: ip change
@@ -41,27 +46,32 @@ daemon = false
 # 7: global flood detection
 # 8: new mac adress without ip
 # 9: mac change
-Action on detect = ""
+action on detect = ""
+
+# module launched on each detection
+mod on detect = ""
+# this chain is transfered to the init function of module loaded
+mod config = ""
 
 # permit to ignore packets whith the lessons interface mac address
-Ignore me = true
+ignore me = true
 
 # script execution timeout (seconds)
-Execution timeout = 10
+execution timeout = 10
 
 # maximun simultaneous lanched script
 max alert = 20
 
 # what data are dumped in leases file
-Dump black list = false
-Dump white list = false
-Dump new address = true
+dump black list = false
+dump white list = false
+dump new address = true
 
 # after this time a mac adress is removed from memory (seconds) (default 1 month)
-Mac timeout = 259200
+mac timeout = 259200
 
 # after this limit the memory hash is cleaned (protect to arp flood)
-Max entry = 1000000
+max entry = 1000000
 
 # this permit to send only one mismatch alert in this time (in seconds)
 anti flood interval = 5  
@@ -73,31 +83,38 @@ anti flood global = 50
 # log if the adress is referenced in hash but is not in white list
 log referenced address = false
 alert on referenced address = false
+mod on referenced address = false
 
 # log if the mac adress is in black list
 log deny address = true
-alert on deny address = false
+alert on deny address = true
+mod on deny address = true
 
 # log if the adress isn't referenced
 log new address = true
-alert on new address = false
+alert on new address = true
+mod on new address = true
 
 # log if the adress isn't referenced (for mac adress only)
 log new mac address = true
-alert on new mac address = false
+alert on new mac address = true
+mod on new mac address = true
 
 # log if the ip adress id different from the last arp request with the same mac adress
 log ip change = true
-alert on ip change = false
+alert on ip change = true
+mod on ip change = true
 
 # log if the ip adress id different from the last arp request with the same mac adress
 log mac change = true
-alert on mac change = false
+alert on mac change = true
+mod on mac change = true
 
 # unauthorized arp request:
 # log all the request not authorized in auth file
 log unauth request = false
 alert on unauth request = false
+mod on unauth request = false
 # dont analyse arp request for unknow hosts (not in white list)
 ignore unknown sender = false
 # ignore windows self test
@@ -109,13 +126,15 @@ unauth ignore time method = 2
 
 # log if the number of request per seconds are > "max request"
 log request abus = true
-alert on request abus = false
+alert on request abus = true
+mod on request abus = true
 # maximun request authorized by second
 Max request = 1000000
 
 # log if the ethernet mac address are different than the arp amc address (only for requestor)
 log mac error = true
-alert on mac error = false
+alert on mac error = true
+mod on mac error = true
 
 # log if have too many arp request per seconds
 log flood = true

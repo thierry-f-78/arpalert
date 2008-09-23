@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.c 139 2006-09-01 21:53:38Z thierry $
+ * $Id: sens.c 223 2006-10-05 19:44:46Z thierry $
  *
  */
 
@@ -13,6 +13,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "arpalert.h"
 #include "loadconfig.h"
@@ -21,14 +24,21 @@
 #include "log.h"
 
 // hash table size ; this number must be primary number
-#define HASH_SIZE 1999
+#define HASH_SIZE 4096
 
 /* debug: */
 // #define DEBUG 1
 
 /* HACHAGE */
-#define sens_hash(a, b, c) ( ( ( (u_char)(a->octet[4]) << 8 ) + (u_char)(a->octet[5]) + \
-                           (u_int32_t)(b.ip) + (u_int32_t)(c) ) % HASH_SIZE )
+#define SENS_HASH(x, y, z) ({ \
+	u_int32_t a, b, c; \
+	a = (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[0]) ^ (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[4]); \
+	b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
+	c = a ^ ( b >> 12 ); \
+	a = ((u_int16_t)(y)) ^ ( ((u_int32_t)(y)) >> 20 ) ^ ( ((u_int8_t)(y)) >> 12 ); \
+	b = ((u_int16_t)(z)) ^ ( ((u_int32_t)(z)) >> 20 ) ^ ( ((u_int8_t)(z)) >> 12 ); \
+	( a ^ b ^ c ) & 0xfff; \
+})
 
 #define BUF_SIZE 1024
 #define MAC_ADRESS_MAX_LEN 17
@@ -41,45 +51,45 @@
 // conv binary mask to ip style mask
 const u_int32_t dec_to_bin[33] = {
 	0x00000000,
-	0x80000000,
-	0xc0000000,
-	0xe0000000,
-	0xf0000000,
-	0xf8000000,
-	0xfc000000,
-	0xfe000000,
-	0xff000000,
-	0xff800000,
-	0xffc00000,
-	0xffe00000,
-	0xfff00000,
-	0xfff80000,
-	0xfffc0000,
-	0xfffe0000,
-	0xffff0000,
-	0xffff8000,
-	0xffffc000,
-	0xffffe000,
-	0xfffff000,
-	0xfffff800,
-	0xfffffc00,
-	0xfffffe00,
-	0xffffff00,
-	0xffffff80,
-	0xffffffc0,
-	0xffffffe0,
-	0xfffffff0,
-	0xfffffff8,
-	0xfffffffc,
-	0xfffffffe,
+	0x00000080,
+	0x000000c0,
+	0x000000e0,
+	0x000000f0,
+	0x000000f8,
+	0x000000fc,
+	0x000000fe,
+	0x000000ff,
+	0x000080ff,
+	0x0000c0ff,
+	0x0000e0ff,
+	0x0000f0ff,
+	0x0000f8ff,
+	0x0000fcff,
+	0x0000feff,
+	0x0000ffff,
+	0x0080ffff,
+	0x00c0ffff,
+	0x00e0ffff,
+	0x00f0ffff,
+	0x00f8ffff,
+	0x00fcffff,
+	0x00feffff,
+	0x00ffffff,
+	0x80ffffff,
+	0xc0ffffff,
+	0xe0ffffff,
+	0xf0ffffff,
+	0xf8ffffff,
+	0xfcffffff,
+	0xfeffffff,
 	0xffffffff
 };
 
 /* structures */
 struct pqt {
-	data_mac mac;
-	data_ip ip_d;
-	u_int32_t mask;
+	struct ether_addr mac;
+	struct in_addr ip_d;
+	struct in_addr mask;
 	struct pqt *next;
 };
 
@@ -87,7 +97,7 @@ struct pqt {
 struct pqt *pqt_h[HASH_SIZE];
 
 /* mask list */
-u_int32_t used_masks[33];
+struct in_addr used_masks[33];
 
 void sens_init(void) {
 	int fd;
@@ -98,8 +108,10 @@ void sens_init(void) {
 	char current[IP_ADRESS_MAX_LEN + MASK_MAX_LEN + 2];
 	int  current_count=0;
 	char cur_dec = 0; // current type read: 0: null; 1: ip; 2: mac; 3: comment
-	data_mac last_mac;
-	u_int32_t ip, mask;
+	struct ether_addr last_mac;
+	struct in_addr ip;
+	struct in_addr binmask;
+	u_int32_t mask;
 	u_int line = 1;
 	int i, j;
 	int flag_mask = FALSE;
@@ -109,7 +121,9 @@ void sens_init(void) {
 	memset(&pqt_h, 0, HASH_SIZE * sizeof(struct pqt *));
 	memset(&list_mask, -1, 33);
 
-	if(config[CF_AUTHFILE].valeur.string[0]==0)return;
+	if(config[CF_AUTHFILE].valeur.string == NULL) {
+		return;
+	}
 
 	// open config file
 	fd = open(config[CF_AUTHFILE].valeur.string, O_RDONLY);
@@ -152,10 +166,11 @@ void sens_init(void) {
 						}
 						find++;
 					}
-					ip = str_to_ip(current);
+					//ip = str_to_ip(current);
+					ip.s_addr = inet_addr(current);
 
 					// network address validation
-					if( (ip & dec_to_bin[mask]) != ip){
+					if( (ip.s_addr & dec_to_bin[mask]) != ip.s_addr){
 						logmsg(LOG_ERR, "[%s %i] error in config file \"%s\" "
 						       "at line %d: the value %s/%u are incorrect",
 						       __FILE__, __LINE__, config[CF_AUTHFILE].valeur.string,
@@ -164,7 +179,8 @@ void sens_init(void) {
 					}
 
 					// add this network value in hash
-					sens_add(&last_mac, (data_ip)ip, dec_to_bin[mask]);
+					binmask.s_addr = dec_to_bin[mask];
+					sens_add(&last_mac, ip, binmask);
 					
 					// find next free position in mask_list or mask itself
 					i=0;
@@ -262,15 +278,15 @@ void sens_init(void) {
 		}
 		// convert decimal mask to binary mask
 		if(list_mask[i] != -1){
-			used_masks[i] = dec_to_bin[(u_char)list_mask[i]];
+			used_masks[i].s_addr = dec_to_bin[(u_char)list_mask[i]];
 		} else {
-			used_masks[i] = END_OF_MASKS;
+			used_masks[i].s_addr = END_OF_MASKS;
 		}
 	}
 }
 
 // add data to hash
-void sens_add(data_mac *mac, data_ip ipb, u_int32_t mask){
+void sens_add(struct ether_addr *mac, struct in_addr ipb, struct in_addr mask){
 	u_int h;
 	struct pqt *mpqt;
 
@@ -280,12 +296,12 @@ void sens_add(data_mac *mac, data_ip ipb, u_int32_t mask){
 		       __FILE__, __LINE__);
 		exit(1);
 	}
-	data_cpy(&mpqt->mac, mac);
+	DATA_CPY(&mpqt->mac, mac);
 	mpqt->ip_d = ipb;
 	mpqt->mask = mask;
 
 	// calculate hash
-	h = sens_hash(mac, ipb, mask);
+	h = SENS_HASH(mac, ipb.s_addr, mask.s_addr);
 	// find a free space
 	mpqt->next = pqt_h[h];
 	pqt_h[h] = mpqt;
@@ -312,27 +328,27 @@ void sens_reload(void){
 	sens_init();
 }
 
-int sens_exist(data_mac *mac, data_ip ipb){
+int sens_exist(struct ether_addr *mac, struct in_addr ipb){
 	u_int h;
 	struct pqt *spqt;
-	u_int32_t *masks = &used_masks[0];
-	data_ip ip;
+	struct in_addr *masks = &used_masks[0];
+	struct in_addr ip;
 
 	// test all masks
-	while(*masks != END_OF_MASKS){
+	while((*masks).s_addr != END_OF_MASKS){
 		
 		// apply mask
-		ip.ip = ipb.ip & *masks;
+		ip.s_addr = ipb.s_addr & (*masks).s_addr;
 
 		// get data in hash
-		h = sens_hash(mac, ip, (*masks));
+		h = SENS_HASH(mac, ip.s_addr, (*masks).s_addr);
 		spqt = pqt_h[h];
 
 		// find data
 		while(spqt != NULL){
-			if(spqt->ip_d.ip == ip.ip &&
-			   spqt->mask == *masks &&
-			   data_cmp(&spqt->mac, mac) == 0 ){
+			if(spqt->ip_d.s_addr == ip.s_addr &&
+			   spqt->mask.s_addr == (*masks).s_addr &&
+			   DATA_CMP(&spqt->mac, mac) == 0 ){
 				return(TRUE);
 			}
 			spqt = spqt->next;
@@ -341,5 +357,4 @@ int sens_exist(data_mac *mac, data_ip ipb){
 	}
 	return(FALSE);
 }
-
 

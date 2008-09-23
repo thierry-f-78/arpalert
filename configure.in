@@ -8,12 +8,6 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(arpalert, 1.0.3)
 
-AC_CONFIG_FILES(Makefile)
-AC_CONFIG_FILES(scripts/start/arpalert-debian)
-AC_CONFIG_FILES(scripts/start/arpalert-fc4)
-AC_CONFIG_FILES(scripts/start/arpalert-suse)
-AC_CONFIG_HEADER(config.h)
-
 # Checks for programs.
 AC_PROG_CC
 #AC_PREFIX_DEFAULT(/usr/local/arpalert)
@@ -31,6 +25,18 @@ AC_CHECK_HEADERS(netinet/if_ether.h netinet/in.h)
 AC_CHECK_HEADERS(errno.h fcntl.h getopt.h grp.h pwd.h)
 AC_CHECK_HEADERS(signal.h stdarg.h stdio.h stdlib.h string.h time.h unistd.h)
 AC_CHECK_HEADERS(sys/ioctl.h sys/param.h sys/socket.h sys/stat.h sys/sysctl.h sys/types.h sys/wait.h)
+AC_CHECK_FUNCS([endgrent])
+AC_CHECK_FUNCS([endpwent])
+AC_CHECK_FUNCS([memset])
+AC_CHECK_FUNCS([socket])
+AC_CHECK_FUNCS([strerror])
+AC_HEADER_STDBOOL
+AC_PREREQ(2.59)
+AC_PROG_AWK
+AC_PROG_GCC_TRADITIONAL
+AC_STRUCT_TM
+AC_TYPE_UID_T
+
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -43,6 +49,7 @@ AC_CHECK_FUNCS(alarm)
 
 #check if libpcap.so is ok
 AC_CHECK_LIB(pcap, pcap_lookupdev)
+AC_CHECK_LIB(dl, dlopen)
 
 ###
 # Enable syslog system
@@ -59,5 +66,11 @@ AC_ARG_ENABLE(debug, [  --enable-debug	Turn on debug system (default=no)], enabl
 if test "x$enable_debug" != "xno"; then
 	AC_DEFINE(DEBUG, 1, [If is debug compilation])
 fi
+
+AC_CONFIG_FILES(Makefile)
+AC_CONFIG_FILES(scripts/start/arpalert-debian)
+AC_CONFIG_FILES(scripts/start/arpalert-fc4)
+AC_CONFIG_FILES(scripts/start/arpalert-suse)
+AC_CONFIG_HEADER(config.h)
 
 AC_OUTPUT

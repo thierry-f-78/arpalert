@@ -1,6 +1,6 @@
 .\"
 .\" Copyright (c) 2005-2010 Thierry FOURNIER
-.\" $Id: arpalert.8 139 2006-09-01 21:53:38Z thierry $
+.\" $Id: arpalert.8 223 2006-10-05 19:44:46Z thierry $
 .\"
 .TH ARPALERT 8 2006-05-09 "" "arp traffic monitoring"
 .SH NAME
@@ -106,6 +106,18 @@ if is set to true, run the program as daemon
 \fBinterface\fR = ""
 lesson this interface. If this value is not specified, the soft select the first interface.
 .TP
+\fBcatch only arp\fR = TRUE
+Configure the network for catch only arp request.
+The detection type "new_mac" is desactived.
+This mode is used for CPU saving if Arpalert is running on a router
+.TP
+\fBmod on detect\fR = ""
+Module file loaded by arpalert. This module is launched on each valid alert.
+This system permit to avoid a costly fork/exec
+.TP
+\fBmod config\fR = ""
+this chain is transfered to the init function of module loaded
+.TP
 \fBaction on detect\fR = ""
 Script launched on each detection. Parameters are: \fBmac adress of requestor\fR, \fBip of requestor\fR, \fBsupp. parm.\fR, \fBtype of alert\fR
 .IP
@@ -113,7 +125,7 @@ type of alert:
 .br
 \fB0:\fR IP change
 .br
-\fB1:\fR Mac address only detected but not in whithe list
+\fB1:\fR Mac address already detected but not in white list
 .br
 \fB2:\fR Mac address in black list
 .br
@@ -127,7 +139,7 @@ type of alert:
 .br
 \fB7:\fR Flood detected
 .br
-\fB8:\fR New mac address whithout.br address
+\fB8:\fR New mac address whithout ip address
 .TP
 \fBignore me\fR = true
 Permit to ignore packets whith the lessons interface mac address
@@ -160,35 +172,23 @@ this permit to send only one mismatch alert in this time (in seconds)
 if the number of arp request in seconds exceed this value, all alerts are ignored for
 "anti flood interval" time
 .TP
-\fBlog referenced address\fR = false
-log if the adress is referenced in hash but is not in white list
+\fBlog referenced address\fR, \fBalert on referenced address\fR, \fBmod on referenced address\fR = false
+log/launch script/call module if the adress is referenced in hash but is not in white list
 .TP
-\fBalert on referenced address\fR = false
-launch script if the adress is referenced in hash but is not in white list
+\fBlog deny address\fR, \fBalert on deny address\fR, \fBmod on deny address\fR = true
+log/launch script/call module if the mac adress is in black list
 .TP
-\fBlog deny address\fR = true
-log if the mac adress is in black list
+\fBlog new address\fR, \fBalert on new address\fR, \fBmod on new address\fR = true
+log/launch script/call module if the adress isn't referenced
 .TP
-\fBalert on deny address\fR = true
-launch script if the mac adress is in black list
+\fBlog mac change\fR, \fBalert on mac change\fR, \fBmod on mac change\fR = true
+log/launch script/call module if the ip adress id different from the last arp request with the same mac adress
 .TP
-\fBlog new address\fR = true
-log if the adress isn't referenced
+\fBlog ip change\fR, \fBalert on ip change\fR, \fBmod on ip change\fR = true
+log/launch script/call module if the ip adress id different from the last arp request with the same mac adress
 .TP
-\fBalert on new address\fR = true
-launch script if the adress isn't referenced
-.TP
-\fBlog ip change\fR = true
-log if the ip adress id different from the last arp request with the same mac adress
-.TP
-\fBalert on ip change\fR = true
-launch script if the ip adress id different from the last arp request with the same mac adress
-.TP
-\fBlog unauth request\fR = true
-unauthorized arp request: log all the request not authorized in auth file
-.TP
-\fBalert on unauth request\fR = true
-unauthorized arp request: launch script if the request are not authorized in auth file
+\fBlog unauth request\fR, \fBalert on unauth request\fR, \fBmod on unauth request\fR = true
+unauthorized arp request: launch if the request are not authorized in auth file
 .TP
 \fBignore unknown sender\fR = true
 dont analyse arp request for unknow hosts (not in white list)
@@ -203,26 +203,19 @@ select suspend time method:
 .br
 2: ignore only tuple (mac address, ip address) during "anti flood interval" time
 .TP
-\fBlog request abus\fR = true
-log if the number of request per seconds are > "max request"
-.TP
-\fBalert on request abus\fR = true
-launch script if the number of request per seconds are > "max request"
+\fBlog request abus\fR, \fBalert on request abus\fR, \fBmod on request abus\fR = true
+log/launch script/call module if the number of request per seconds are > "max request"
 .TP
 \fBmax request\fR = 1000000
 maximun request authorized by second
 .TP
-\fBlog mac error\fR = true
-log if the ethernet mac address are different than the arp amc address (only for requestor)
-.TP
-\fBalert on mac error\fR = true
-launch script if the ethernet mac address are different than the arp amc address (only for requestor)
+\fBlog mac error\fR, \fBalert on mac error\fR, \fBmod on mac error\fR = true
+log/launch script/call module if the ethernet mac address are different than the arp amc address (only for requestor)
 .TP
 \fBlog flood\fR = true
-log if have too many arp request per seconds
-.TP
 \fBalert on flood\fR = true
-launch script if have too many arp request per seconds
+\fBmod on flood\fR = true
+log/launch script/call module if have too many arp request per seconds
 .\"
 .\" CONFIG FILE
 .\"

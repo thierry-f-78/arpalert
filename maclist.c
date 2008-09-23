@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: maclist.c 139 2006-09-01 21:53:38Z thierry $
+ * $Id: maclist.c 223 2006-10-05 19:44:46Z thierry $
  *
  */
 
@@ -12,6 +12,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "arpalert.h"
 #include "maclist.h"
@@ -24,11 +27,11 @@
 void maclist_file(char *, int);
 
 void maclist_load(void){
-	if(config[CF_MACLIST].valeur.string[0] != 0){
+	if(config[CF_MACLIST].valeur.string != NULL){
 		maclist_file(config[CF_MACLIST].valeur.string, ALLOW);
 	}
 
-	if(config[CF_BLACKLST].valeur.string[0] != 0){
+	if(config[CF_BLACKLST].valeur.string != NULL){
 		maclist_file(config[CF_BLACKLST].valeur.string, DENY);
 	}
 }
@@ -102,10 +105,10 @@ void maclist_file(char *file, int level){
 	u_int32_t alerts = 0;
 
 	// numeric mac
-	data_mac mac;
+	struct ether_addr mac;
 
 	// numeric ip
-	u_int32_t ip;
+	struct in_addr ip;
 
 	// init mac and ip buffers
 	memset(str_mac, 0, 17);
@@ -186,7 +189,7 @@ void maclist_file(char *file, int level){
 				str_to_mac(str_mac, &mac);
 
 				// convert string ip to numeric IP
-				ip = str_to_ip(str_ip);
+				ip.s_addr = inet_addr(str_ip);
 
 				// adding data to the hash table
 				// data_add(&mac, level, ip);

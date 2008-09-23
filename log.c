@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.c 139 2006-09-01 21:53:38Z thierry $
+ * $Id: log.c 223 2006-10-05 19:44:46Z thierry $
  *
  */
 
@@ -12,6 +12,8 @@
 #include <time.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef USE_SYSLOG
@@ -21,6 +23,8 @@
 #include "arpalert.h"
 #include "log.h"
 #include "loadconfig.h"
+
+extern int errno;
 
 FILE *lf;
 const char *mois[12] = {
@@ -44,10 +48,11 @@ void initlog(void){
 		openlog("arpalert", LOG_CONS, LOG_DAEMON);
 	}
 	#endif
-	if(config[CF_LOGFILE].valeur.string[0] != 0){
-		if((lf = fopen(config[CF_LOGFILE].valeur.string, "a"))==NULL){
-			fprintf(stderr, "[%s %d] Cant't open file [%s]\n",
-			        __FILE__, __LINE__, config[CF_LOGFILE].valeur.string);
+	if(config[CF_LOGFILE].valeur.string != NULL){
+		lf = fopen(config[CF_LOGFILE].valeur.string, "a");
+		if(lf == NULL){
+			fprintf(stderr, "[%s %d] fopen[%d]: %s\n",
+			        __FILE__, __LINE__, errno, strerror(errno));
 			exit(1);
 		}
 	}
@@ -64,7 +69,7 @@ void logmsg(int priority, const char *fmt, ...){
 		priority > config[CF_LOGLEVEL].valeur.integer ||
 
 		(
-			config[CF_LOGFILE].valeur.string[0] == 0 &&
+			config[CF_LOGFILE].valeur.string == NULL &&
 			config[CF_DAEMON].valeur.integer == TRUE
 			#ifdef USE_SYSLOG
 			&& config[CF_USESYSLOG].valeur.integer == FALSE
@@ -87,7 +92,7 @@ void logmsg(int priority, const char *fmt, ...){
 	}
 	#endif
 
-	if(config[CF_LOGFILE].valeur.string[0] != 0){
+	if(config[CF_LOGFILE].valeur.string != NULL){
 		fprintf(lf, "%s % 2d %02d:%02d:%02d arpalert: %s\n",
 		        mois[tm->tm_mon],
 		        tm->tm_mday,

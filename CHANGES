@@ -1,5 +1,19 @@
+1.1.0   * info<at>arpalert<dot>org
+          new function: permit to lesson only ARP traffic (alert new_mac disabled)
+          new function: permit to call a .so extension
+          normalize code with use "struct in_addr" for the ip address
+          normalize code with use "struct ether_header" for the mac address
+          normalize code with use "struct arphdr" for decoding ethernet header
+          changing hash algoritm for homogeneously reparttion of mac adresses
+          normalize macro case
+          change test for testing bitfield
+          flood alert: remove parameter
+          mac change alert: add parameter
+          add api for mod alerts
+          clean code
+
 1.0.3   * info<at>arpalert<dot>org
-          add option -V to return arpalert version<br />
+          add option -V to return arpalert version
           syntax updates in man
           change condition order in alert detection routine
           change log syntax for the loading file function

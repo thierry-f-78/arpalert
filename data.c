@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 139 2006-09-01 21:53:38Z thierry $
+ * $Id: data.c 223 2006-10-05 19:44:46Z thierry $
  *
  */
 
@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <arpa/inet.h>
 
 #include "arpalert.h"
 #include "data.h"
@@ -20,7 +21,8 @@
 #include "loadconfig.h"
 
 // hash table size (must be a primary number)
-#define HASH_SIZE 1999
+//#define HASH_SIZE 1999
+#define HASH_SIZE 4096
 
 // conversion hexa -> bin
 const u_char hex_conv[103] = {
@@ -41,11 +43,23 @@ const u_char hex_conv[103] = {
 unsigned int data_size;
 
 //unsigned int data_mac_hash(data_mac *mac);
-#define DATA_MAC_HASH(a) ( ( ( (u_char)(a->octet[4]) << 8 )  + \
-                           (u_char)(a->octet[5]) ) % HASH_SIZE )
+// retourn un resultat sur 12 bits
+#define DATA_MAC_HASH(x) ({ \
+   u_int32_t a, b; \
+	a = (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[0]) ^ (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[4]); \
+	b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
+	( a ^ ( b >> 12 ) ) & 0xfff; \
+})
 
 //unsigned int data_ip_hash(data_mac *mac);
-#define DATA_IP_HASH(a) ( (u_int32_t)a % HASH_SIZE )
+// retourn un resultat sur 12 bits
+#define DATA_IP_HASH(x) ({ \
+	u_int32_t a, b, c; \
+	a = (u_int16_t)(x) & 0xfff; \
+	b = (u_int32_t)(x) >> 20; \
+	c = (u_int8_t)(x) >> 12; \
+	a ^ b ^ c; \
+})
 
 // hash table cell
 struct data_element {
@@ -65,6 +79,7 @@ int dump_mask;
 
 // init memory
 void data_init(void){
+
 	memset(data_mac_tab, 0, HASH_SIZE * sizeof(struct data_element *));
 	memset(data_ip_tab, 0, HASH_SIZE * sizeof(struct data_element *));
 	data_size = 0;
@@ -94,7 +109,7 @@ void data_reset(void){
 }
 
 // add mac address in hash
-void data_add_field(data_mac *mac, int status,  int ip, u_int32_t field){
+void data_add_field(struct ether_addr *mac, int status, struct in_addr ip, u_int32_t field){
 	data_pack *datap;
 	
 	datap = data_add(mac, status, ip);
@@ -102,7 +117,7 @@ void data_add_field(data_mac *mac, int status,  int ip, u_int32_t field){
 }
 
 // add mac address in hash
-data_pack *data_add(data_mac *mac, int status,  int ip){
+data_pack *data_add(struct ether_addr *mac, int status, struct in_addr ip){
 	struct data_element *add;
 	struct data_element *libre;
 	int mac_hash;
@@ -126,9 +141,9 @@ data_pack *data_add(data_mac *mac, int status,  int ip){
 	}
 
 	// make data structur
-	data_cpy(&libre->data.mac, mac);
+	DATA_CPY(&libre->data.mac, mac);
 	libre->data.flag = status;
-	libre->data.ip.ip = ip;
+	libre->data.ip.s_addr = ip.s_addr;
 	libre->data.timestamp = current_time;
 	libre->data.lastalert[0] = 0;
 	libre->data.lastalert[1] = 0;
@@ -150,10 +165,10 @@ data_pack *data_add(data_mac *mac, int status,  int ip){
 	data_mac_tab[mac_hash] = libre;
 	
 	// index ip
-	if(ip != 0 && data_ip_exist(ip) == NULL ){
+	if(ip.s_addr != 0 && data_ip_exist(ip) == NULL ){
 			
 		// calculate ip hash
-		ip_hash = DATA_IP_HASH(ip);
+		ip_hash = DATA_IP_HASH(ip.s_addr);
 		// find free space in ip hash
 		libre->next_ip = data_ip_tab[ip_hash];
 		data_ip_tab[ip_hash] = libre;
@@ -173,7 +188,7 @@ data_pack *data_add(data_mac *mac, int status,  int ip){
 
 // add ip in index
 void index_ip(data_pack *to_index){
-	data_mac *mac;
+	struct ether_addr *mac;
 	struct data_element *find;
 	int hash;
 
@@ -186,7 +201,7 @@ void index_ip(data_pack *to_index){
 	}
 
 	// calculate ip hash
-	hash = DATA_IP_HASH(to_index->ip.ip);
+	hash = DATA_IP_HASH(to_index->ip.s_addr);
 	// add data
 	find->next_ip = data_ip_tab[hash];
 	data_ip_tab[hash] = find;
@@ -204,7 +219,7 @@ void unindex_ip(u_int32_t ip){
 
 	// find entry
 	previous = (struct data_element *)&data_ip_tab[hash];
-	while(find != NULL && find->data.ip.ip != ip) {
+	while(find != NULL && find->data.ip.s_addr != ip) {
 		previous = (struct data_element *)&find->next_ip;
 		find = find->next_ip;
 	}
@@ -225,7 +240,7 @@ void data_dump(void){
 	char msg[35]; //mac(17) + ip(15) + spc + \n + \0
 
 	// if no data dump file
-	if(config[CF_LEASES].valeur.string[0] == 0) {
+	if(config[CF_LEASES].valeur.string == NULL) {
 		return;
 	}
 	
@@ -246,13 +261,12 @@ void data_dump(void){
 		while(dump != NULL){
 			// dump
 			if( ( dump_mask & dump->data.flag) != 0 ){
-				if(dump->data.ip.ip != 0){
-					len = snprintf(msg, 35, "%02x:%02x:%02x:%02x:%02x:%02x %i.%i.%i.%i\n",
-					              dump->data.mac.octet[0], dump->data.mac.octet[1],
-					              dump->data.mac.octet[2], dump->data.mac.octet[3],
-					              dump->data.mac.octet[4], dump->data.mac.octet[5], 
-					              dump->data.ip.bytes[3], dump->data.ip.bytes[2], 
-					              dump->data.ip.bytes[1], dump->data.ip.bytes[0]);
+				if(dump->data.ip.s_addr != 0){
+					len = snprintf(msg, 35, "%02x:%02x:%02x:%02x:%02x:%02x %s\n",
+					              dump->data.mac.ETHER_ADDR_OCTET[0], dump->data.mac.ETHER_ADDR_OCTET[1],
+					              dump->data.mac.ETHER_ADDR_OCTET[2], dump->data.mac.ETHER_ADDR_OCTET[3],
+					              dump->data.mac.ETHER_ADDR_OCTET[4], dump->data.mac.ETHER_ADDR_OCTET[5], 
+					              inet_ntoa(dump->data.ip));
 					write(fp, msg, len);
 				}
 			}
@@ -299,16 +313,16 @@ void data_clean(int timeout){
 }
 
 // get ip in ip hash
-data_pack *data_ip_exist(u_int32_t ip){
+data_pack *data_ip_exist(struct in_addr ip){
 	struct data_element *find;
 	int hash;
 
 	// calculate hash
-	hash = DATA_IP_HASH(ip);
+	hash = DATA_IP_HASH(ip.s_addr);
 	find = data_ip_tab[hash];
 
 	while(find != NULL){
-		if(find->data.ip.ip == ip){
+		if(find->data.ip.s_addr == ip.s_addr){
 			return( &find->data );
 		}
 		find = find->next_ip;
@@ -317,7 +331,7 @@ data_pack *data_ip_exist(u_int32_t ip){
 }
 
 // get mac in hash
-data_pack *data_exist(data_mac *mac){
+data_pack *data_exist(struct ether_addr *mac){
 	struct data_element *find;
 	int hash;
 
@@ -326,7 +340,7 @@ data_pack *data_exist(data_mac *mac){
 	find = data_mac_tab[hash];
 
 	while(find != NULL){
-		if(data_cmp(&find->data.mac, mac) == 0){
+		if(DATA_CMP(&find->data.mac, mac) == 0){
 			return( &find->data );
 		}
 		find = find->next_mac;
@@ -335,12 +349,13 @@ data_pack *data_exist(data_mac *mac){
 }
 
 // translate string ip to u_int32_t
+/*
 u_int32_t str_to_ip(char *ip){
 	char *parse;
 	char *begin;
 	u_int conv;
 	int count = 3;
-	data_ip ip_32;
+	struct in_addr ip_32;
 	char end_char;
 
 	begin = ip;
@@ -386,9 +401,10 @@ u_int32_t str_to_ip(char *ip){
 	
 	return ip_32.ip;
 }
+*/
 
 // translate string mac to binary mac
-void str_to_mac(char *macaddr, data_mac *to_mac){
+void str_to_mac(char *macaddr, struct ether_addr *to_mac){
 	int i;
 	
 	// format verification
@@ -420,17 +436,17 @@ void str_to_mac(char *macaddr, data_mac *to_mac){
 		}
 	}
 
-	to_mac->octet[0] =  hex_conv[(u_char)macaddr[1]];
-	to_mac->octet[0] += hex_conv[(u_char)macaddr[0]] * 16;
-	to_mac->octet[1] =  hex_conv[(u_char)macaddr[4]];
-	to_mac->octet[1] += hex_conv[(u_char)macaddr[3]] * 16;
-	to_mac->octet[2] =  hex_conv[(u_char)macaddr[7]];
-	to_mac->octet[2] += hex_conv[(u_char)macaddr[6]] * 16;
-	to_mac->octet[3] =  hex_conv[(u_char)macaddr[10]];
-	to_mac->octet[3] += hex_conv[(u_char)macaddr[9]] * 16;
-	to_mac->octet[4] =  hex_conv[(u_char)macaddr[13]];
-	to_mac->octet[4] += hex_conv[(u_char)macaddr[12]] * 16;
-	to_mac->octet[5] =  hex_conv[(u_char)macaddr[16]];
-	to_mac->octet[5] += hex_conv[(u_char)macaddr[15]] * 16;
+	to_mac->ETHER_ADDR_OCTET[0] =  hex_conv[(u_char)macaddr[1]];
+	to_mac->ETHER_ADDR_OCTET[0] += hex_conv[(u_char)macaddr[0]] * 16;
+	to_mac->ETHER_ADDR_OCTET[1] =  hex_conv[(u_char)macaddr[4]];
+	to_mac->ETHER_ADDR_OCTET[1] += hex_conv[(u_char)macaddr[3]] * 16;
+	to_mac->ETHER_ADDR_OCTET[2] =  hex_conv[(u_char)macaddr[7]];
+	to_mac->ETHER_ADDR_OCTET[2] += hex_conv[(u_char)macaddr[6]] * 16;
+	to_mac->ETHER_ADDR_OCTET[3] =  hex_conv[(u_char)macaddr[10]];
+	to_mac->ETHER_ADDR_OCTET[3] += hex_conv[(u_char)macaddr[9]] * 16;
+	to_mac->ETHER_ADDR_OCTET[4] =  hex_conv[(u_char)macaddr[13]];
+	to_mac->ETHER_ADDR_OCTET[4] += hex_conv[(u_char)macaddr[12]] * 16;
+	to_mac->ETHER_ADDR_OCTET[5] =  hex_conv[(u_char)macaddr[16]];
+	to_mac->ETHER_ADDR_OCTET[5] += hex_conv[(u_char)macaddr[15]] * 16;
 }
 

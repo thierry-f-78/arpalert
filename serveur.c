@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.c 139 2006-09-01 21:53:38Z thierry $
+ * $Id: serveur.c 223 2006-10-05 19:44:46Z thierry $
  *
  */
 
@@ -94,7 +94,7 @@ void separe(void){
 	write(fd, str, strlen(str));
 
 	// privilege separation
-	if(config[CF_USER].valeur.string[0] != 0) { 
+	if(config[CF_USER].valeur.string != NULL) { 
 
 		// get uid and gid by username 
 		pwd = getpwnam(config[CF_USER].valeur.string);
@@ -124,7 +124,7 @@ void separe(void){
 	}
 
 	// chrooting
-	if (config[CF_CHROOT].valeur.string[0] != 0) {
+	if (config[CF_CHROOT].valeur.string != NULL) {
 			  
 		// chrooting
 		if (chroot(config[CF_CHROOT].valeur.string)){
@@ -140,7 +140,7 @@ void separe(void){
 	}
 
 	// change user
-	if(config[CF_USER].valeur.string[0] != 0) {
+	if(config[CF_USER].valeur.string != NULL) {
 		if (setuid(uid) == -1){
 			logmsg(LOG_ERR, "[%s %i] setuid(%ld) error", __FILE__, __LINE__, (long)uid);
 			exit(1);

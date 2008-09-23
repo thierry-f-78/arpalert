@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile.in 139 2006-09-01 21:53:38Z thierry $
+# $Id: Makefile.in 223 2006-10-05 19:44:46Z thierry $
 # 
 
 prefix = @prefix@
@@ -30,6 +30,7 @@ LIBS = @LIBS@
 OBJECT_LIST = \
 	$(src_dir)/arpalert.o \
 	$(src_dir)/loadconfig.o \
+	$(src_dir)/loadmodule.o \
 	$(src_dir)/log.o \
 	$(src_dir)/data.o \
 	$(src_dir)/maclist.o \
@@ -41,6 +42,9 @@ OBJECT_LIST = \
 
 arpalert: $(OBJECT_LIST)
 	$(CC) $(CFLAGS) -g -O2 -o arpalert $(OBJECT_LIST) $(LIBS)
+
+loadmodule.o: loadmodule.c config.h log.h loadmodule.h loadconfig.h
+	$(CC) $(CFLAGS) -c -o loadmodule.o $(src_dir)/loadmodule.c
 
 alerte.o: alerte.c config.h alerte.h log.h loadconfig.h errmsg.h serveur.h
 	$(CC) $(CFLAGS) -c -o alerte.o $(src_dir)/alerte.c

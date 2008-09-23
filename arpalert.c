@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: arpalert.c 139 2006-09-01 21:53:38Z thierry $
+ * $Id: arpalert.c 223 2006-10-05 19:44:46Z thierry $
  *
  */
 
@@ -27,6 +27,7 @@
 #include "alerte.h"
 #include "sens.h"
 #include "sens_timeouts.h"
+#include "loadmodule.h"
 
 // system check every seconds
 #define CHECKPOINT 1
@@ -50,10 +51,13 @@ int main(int argc, char **argv){
 	
 	// read config file
 	config_load(argc, argv);
-	
+
 	// log system initialization
 	initlog();
 	
+	// load module alert
+	if(config[CF_MOD_ALERT].valeur.string != NULL) module_load();
+
 	// pcap initialization
 	cap_init();
 
@@ -102,6 +106,10 @@ void die(int signal){
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] End with signal: %i", __FILE__, __LINE__, signal);
 	#endif
+
+	// close module
+	if(config[CF_MOD_ALERT].valeur.string != NULL) module_unload();
+	
 	exit(0);
 }
 
