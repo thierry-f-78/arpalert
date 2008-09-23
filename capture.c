@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: capture.c 124 2006-05-10 21:46:12Z thierry $
+ * $Id: capture.c 139 2006-09-01 21:53:38Z thierry $
  *
  */
 
@@ -452,16 +452,21 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		// sender is known
 		arp_ip_sender.ip != 0 &&
 
-		// sender exist
-		(ip_data = data_ip_exist(arp_ip_sender.ip)) != NULL &&
-
 		// if the bitfield is not active
 		ISSET_MAC_CHANGE(eth_data->alerts) == FALSE &&
 		
+		// sender exist
+		(ip_data = data_ip_exist(arp_ip_sender.ip)) != NULL &&
+
 		// have different mac address
 		//data_cmp(&ip_data->mac.octet[0], eth_mac_sender) != 0
-		ip_data != eth_data
+		//ip_data != eth_data
+		data_cmp(&ip_data->mac.octet[0], &eth_data->mac.octet[0]) != 0
 	){
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+		MAC_TO_STR(ip_data->mac, mac_tmp);
+
 		// maj ip in database
 		unindex_ip(arp_ip_sender.ip);
 		eth_data->ip.ip = arp_ip_sender.ip;
@@ -470,10 +475,6 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		// can dump database
 		flagdump = TRUE;
 	
-		STR_ETH_MAC_SENDER
-		ARP_IP_SENDER
-		MAC_TO_STR(ip_data->mac, mac_tmp);
-
 		if(config[CF_LOG_MACCHG].valeur.integer == TRUE){
 			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=mac_change",
 			       seq, str_eth_mac_sender, str_arp_ip_sender, mac_tmp);
@@ -518,17 +519,17 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 		// maj timeout
 		eth_data->lastalert[0] = timeact;
 					
+		// convert ip to string
+		IP_TO_STR(eth_data->ip, ip_tmp);
+		STR_ETH_MAC_SENDER
+		ARP_IP_SENDER
+	
 		// maj database
 		eth_data->ip.ip = arp_ip_sender.ip;
 		index_ip(eth_data);
 
 		// can dump database
 		flagdump = TRUE;
-	
-		// convert ip to string
-		IP_TO_STR(eth_data->ip, ip_tmp);
-		STR_ETH_MAC_SENDER
-		ARP_IP_SENDER
 	
 		if(config[CF_LOGIP].valeur.integer == TRUE){
 			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, reference=%s, type=ip_change",

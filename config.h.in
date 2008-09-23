@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: config.h.in 124 2006-05-10 21:46:12Z thierry $
+ * $Id: config.h.in 139 2006-09-01 21:53:38Z thierry $
  *
  */
 
 #undef DEBUG
 #undef DEBUG_MALLOC
 #undef USE_SYSLOG
-
+#undef PACKAGE_VERSION

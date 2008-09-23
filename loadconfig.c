@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 124 2006-05-10 21:46:12Z thierry $
+ * $Id: loadconfig.c 139 2006-09-01 21:53:38Z thierry $
  *
  */
 
@@ -15,7 +15,7 @@
 #include "loadconfig.h"
 #include "log.h"
 
-#define OPTIONS "f:i:p:Pe:dwD:l:v"
+#define OPTIONS "f:i:p:Pe:dwD:l:vV"
 
 char msg[4096];
 int dump = 0;
@@ -39,6 +39,7 @@ void usage(){
 	"    -h this help\n"
 	"    -w debug option: print a dump of paquets captured\n"
 	"    -P run in promiscuous mode\n"
+	"    -V version\n"
 	"\n");
 	exit(1);
 }
@@ -275,8 +276,8 @@ void config_load(int argc, char *argv[]){
 	buf = buffer;
 	fp = fopen(config_file, "r");
 	if(fp == NULL){
-		fprintf(stderr, "[%s %i] didn't find %s, loading default config\n",
-			__FILE__, __LINE__, config_file);
+		fprintf(stderr, "didn't find %s, loading default config\n",
+		        config_file);
 	} else {
 		while((buf = fgets(buf, 4096, fp)) != NULL){
 			miseenforme(buf);
@@ -347,6 +348,11 @@ void config_load(int argc, char *argv[]){
 	
 				case 'v':
 					dump = 1;
+					break;
+				
+				case 'V':
+					printf("arpalert %s\n", PACKAGE_VERSION);
+					exit(0);
 					break;
 				
 				case 'w':
@@ -424,17 +430,21 @@ void miseenmemoire(char *buf){
 		if(protection != 255 && *src=='=')m_eq=src;
 		src++;
 	}
+	if(m_eq==NULL){
+		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
+		exit(1);
+	}
 	m_end=src;
 	if(*m_eq!='='){
-		fprintf(stderr, "%i: error in config file at line: %s\n", __LINE__, buf);
+		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
 		exit(1);
 	}
 	if(*(m_eq-1)!=' '){
-		fprintf(stderr, "%i: error in config file at line: %s\n", __LINE__, buf);
+		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
 		exit(1);
 	}
 	if(*(m_eq+1)!=' '){
-		fprintf(stderr, "%i: error in config file at line: %s\n", __LINE__, buf);
+		fprintf(stderr, "error in config file at line: \"%s\"\n", buf);
 		exit(1);
 	}
 	src=buf;
@@ -472,9 +482,9 @@ void miseenmemoire(char *buf){
 		i++;
 	}
 	if(ok == 0){
-		fprintf(stderr, "[%s %i] error in config file at "
+		fprintf(stderr, "error in config file at "
 		        "line: \"%s\": parameter inexistent\n",
-		        __FILE__, __LINE__, buf);
+		        buf);
 		exit(1);
 	}
 }
@@ -488,9 +498,9 @@ int convert_octal(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'7'){
-			fprintf(stderr, "[%s %i] error in config file in "
+			fprintf(stderr, "error in config file in "
 			        "string \"%s\": octal value expected\n",
-			        __FILE__, __LINE__, b);
+			        b);
 			exit(1);
 		}
 		i = res;
@@ -508,9 +518,9 @@ int convert_int(char *buf){
 	b = buf;
 	while(*buf != 0){
 		if(*buf<'0' || *buf>'9'){
-			fprintf(stderr, "[%s %i] error in config file in "
+			fprintf(stderr, "error in config file in "
 			        "string \"%s\": integer value expected\n",
-			        __FILE__, __LINE__, b);
+			        b);
 			exit(1);
 		}
 		res *= 10;
@@ -533,8 +543,8 @@ int convert_boolean(char *buf){
 	if(strcmp("false", buf) == 0) return(FALSE);
 	if(strcmp("0",     buf) == 0) return(FALSE);
 
-	fprintf(stderr, "[%s %i] error in config file: boolean value expected\n",
-		__FILE__, __LINE__);
+	fprintf(stderr, "error in config file: boolean value expected [%s]\n",
+		buf);
 	exit(1);	 
 }
 

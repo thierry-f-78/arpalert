@@ -1,6 +1,6 @@
 .\"
 .\" Copyright (c) 2005-2010 Thierry FOURNIER
-.\" $Id: arpalert.8 124 2006-05-10 21:46:12Z thierry $
+.\" $Id: arpalert.8 139 2006-09-01 21:53:38Z thierry $
 .\"
 .TH ARPALERT 8 2006-05-09 "" "arp traffic monitoring"
 .SH NAME
@@ -94,7 +94,7 @@ dump fil
 \fBauth request file\fR = /etc/arpalert/authrq.conf
 list of authorized request"
 .TP
-\fBLock file\fR = /var/run/arpalert.lock
+\fBlock file\fR = /var/run/arpalert.lock
 pid file
 .TP
 \fBdump paquet\fR = false
@@ -106,7 +106,7 @@ if is set to true, run the program as daemon
 \fBinterface\fR = ""
 lesson this interface. If this value is not specified, the soft select the first interface.
 .TP
-\fBAction on detect\fR = ""
+\fBaction on detect\fR = ""
 Script launched on each detection. Parameters are: \fBmac adress of requestor\fR, \fBip of requestor\fR, \fBsupp. parm.\fR, \fBtype of alert\fR
 .IP
 type of alert:
@@ -129,28 +129,28 @@ type of alert:
 .br
 \fB8:\fR New mac address whithout.br address
 .TP
-\fBIgnore me\fR = true
+\fBignore me\fR = true
 Permit to ignore packets whith the lessons interface mac address
 .TP
-\fBExecution timeout\fR = 10
+\fBexecution timeout\fR = 10
 script execution timeout (seconds)
 .TP
 \fBmax alert\fR = 20
 maximun simultaneous lanched script
 .TP
-\fBDump black list\fR = false
+\fBdump black list\fR = false
 dump the black listed mac address in leases file
 .TP
-\fBDump white list\fR = false
+\fBdump white list\fR = false
 dump the white listed mac address in leases file
 .TP
-\fBDump new address\fR = true
+\fBdump new address\fR = true
 dump the new mac address in leases file
 .TP
-\fBMac timeout\fR = 259200
+\fBmac timeout\fR = 259200
 after this time a mac adress is removed from memory (seconds) (default 1 month)
 .TP
-\fBMax entry\fR = 1000000
+\fBmax entry\fR = 1000000
 after this limit the memory hash is cleaned (protect to arp flood)
 .TP
 \fBanti flood interval\fR = 10
@@ -209,7 +209,7 @@ log if the number of request per seconds are > "max request"
 \fBalert on request abus\fR = true
 launch script if the number of request per seconds are > "max request"
 .TP
-\fBMax request\fR = 1000000
+\fBmax request\fR = 1000000
 maximun request authorized by second
 .TP
 \fBlog mac error\fR = true
