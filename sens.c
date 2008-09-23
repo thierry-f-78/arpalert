@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.c 203 2006-10-05 00:08:23Z  $
+ * $Id: sens.c 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,7 +23,9 @@
 #include "loadconfig.h"
 #include "data.h"
 #include "sens.h"
+#include "capture.h"
 #include "log.h"
+#include "func_str.h"
 
 // hash table size ; this number must be primary number
 #define HASH_SIZE 4096
@@ -31,25 +35,29 @@
 
 /* HACHAGE */
 #define SENS_HASH(x, y, z) ({ \
-	u_int32_t a, b, c; \
-	a = (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[0]) ^ (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[4]); \
+	U_INT32_T a, b, c; \
+	a = (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[0]) ^ (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[4]); \
 	b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
 	c = a ^ ( b >> 12 ); \
-	a = ((u_int16_t)(y)) ^ ( ((u_int32_t)(y)) >> 20 ) ^ ( ((u_int8_t)(y)) >> 12 ); \
-	b = ((u_int16_t)(z)) ^ ( ((u_int32_t)(z)) >> 20 ) ^ ( ((u_int8_t)(z)) >> 12 ); \
+	a = ((U_INT16_T)(y)) ^ ( ((U_INT32_T)(y)) >> 20 ) ^ ( ((U_INT8_T)(y)) >> 12 ); \
+	b = ((U_INT16_T)(z)) ^ ( ((U_INT32_T)(z)) >> 20 ) ^ ( ((U_INT8_T)(z)) >> 12 ); \
 	( a ^ b ^ c ) & 0xfff; \
 })
 
-#define BUF_SIZE 1024
+#define BUF_SIZE           1024
+#define MAX_ARGS           150
+#define MAX_CONTEXT_ARGS   20
 #define MAC_ADRESS_MAX_LEN 17
-#define IP_ADRESS_MAX_LEN 15
-#define MASK_MAX_LEN 2
+#define IP_ADRESS_MAX_LEN  15
+#define MASK_MAX_LEN       2
 
 // masks 
 #define END_OF_MASKS 0x00000001
 
+extern int errno;
+
 // conv binary mask to ip style mask
-const u_int32_t dec_to_bin[33] = {
+const U_INT32_T dec_to_bin[33] = {
 	0x00000000,
 	0x00000080,
 	0x000000c0,
@@ -90,6 +98,7 @@ struct pqt {
 	struct ether_addr mac;
 	struct in_addr ip_d;
 	struct in_addr mask;
+	struct capt *idcap;
 	struct pqt *next;
 };
 
@@ -100,24 +109,35 @@ struct pqt *pqt_h[HASH_SIZE];
 struct in_addr used_masks[33];
 
 void sens_init(void) {
-	int fd;
+	//int read_size;
+	//char *find;
+	//char current[IP_ADRESS_MAX_LEN + MASK_MAX_LEN + 2];
+	//int  current_count=0;
+	//char cur_dec = 0; // current type read: 0: null; 1: ip; 2: mac; 3: comment
+	//struct ether_addr last_mac;
+	//u_int line = 1;
+	//int flag_mask = FALSE;
+	FILE *fd;
 	char buf[BUF_SIZE];
-	int read_size;
 	char *parse;
-	char *find;
-	char current[IP_ADRESS_MAX_LEN + MASK_MAX_LEN + 2];
-	int  current_count=0;
-	char cur_dec = 0; // current type read: 0: null; 1: ip; 2: mac; 3: comment
-	struct ether_addr last_mac;
-	struct in_addr ip;
-	struct in_addr binmask;
-	u_int32_t mask;
-	u_int line = 1;
 	int i, j;
-	int flag_mask = FALSE;
 	char sort_tmp;
 	char list_mask[33];
+	char *str_ip;
+	char *str_mask;
+	struct in_addr ip;
+	U_INT32_T mask;
+	struct in_addr binmask;
+	struct ether_addr mac;
+	struct capt *idcap = NULL;
+	char *args[MAX_ARGS];
+	int arg_c;
+	int arg_n;
+	int *arg;
+	int ligne = 0;
+	int context;
 
+	// init memory
 	memset(&pqt_h, 0, HASH_SIZE * sizeof(struct pqt *));
 	memset(&list_mask, -1, 33);
 
@@ -125,147 +145,139 @@ void sens_init(void) {
 		return;
 	}
 
-	// open config file
-	fd = open(config[CF_AUTHFILE].valeur.string, O_RDONLY);
-	if(fd == -1){
-		logmsg(LOG_ERR, "[%s %i] didn't find authorization file %s",
-		       __FILE__, __LINE__, config[CF_AUTHFILE].valeur.string);
+	// open file
+	fd = fopen(config[CF_AUTHFILE].valeur.string, "r");
+	if(fd == NULL){
+		logmsg(LOG_ERR, "[%s %i] fopen: %s",
+		       __FILE__, __LINE__, strerror(errno));
 		exit(1);
 	}
 
-	// parsing acces file
-	current[0] = 0;
-	do {
-		read_size = read(fd, buf, BUF_SIZE);
-		if(read_size < BUF_SIZE){
-			buf[read_size] = '\n';
-			read_size++;
-		}
+	// read lines
+	while(!feof(fd)){
+		fgets(buf, BUF_SIZE, fd);
+		ligne++;
 
+		arg_c = 0;
+		arg_n = MAX_CONTEXT_ARGS;
+		arg = &arg_n;
+		bzero(args, sizeof(char *) * MAX_ARGS);
 		parse = buf;
-		while(parse < &buf[read_size]){
-			if(*parse == '\r'){
-				parse++;
-				continue;
+		context = 0;
+		while(*parse != 0){
+			// mac / interface identification
+			if(*parse == '['){
+				*parse = ' ';
+				arg = &arg_c;
+			}
+			else if(*parse == ']'){
+				*parse = ' ';
+				arg = &arg_n;
 			}
 
-			if(*parse == ' '  ||
-			   *parse == '\t' ||
-			   *parse == ']' ||
-			   *parse == '\n' ){
-				if(cur_dec == 1){
-					current[current_count] = 0;
-					find = &current[0];
-					mask = 32;
-					while(*find != 0){
-						if(*find=='/'){
-							*find = 0;
-							find++;
-							mask = atoi(find);
-							break;
-						}
-						find++;
-					}
-					//ip = str_to_ip(current);
-					ip.s_addr = inet_addr(current);
-
-					// network address validation
-					if( (ip.s_addr & dec_to_bin[mask]) != ip.s_addr){
-						logmsg(LOG_ERR, "[%s %i] error in config file \"%s\" "
-						       "at line %d: the value %s/%u are incorrect",
-						       __FILE__, __LINE__, config[CF_AUTHFILE].valeur.string,
-						       line, current, mask);
-						exit(1);
-					}
-
-					// add this network value in hash
-					binmask.s_addr = dec_to_bin[mask];
-					sens_add(&last_mac, ip, binmask);
-					
-					// find next free position in mask_list or mask itself
-					i=0;
-					while(list_mask[i] != mask && list_mask[i] != -1){
-						i++;
-					}
-					if(list_mask[i] == -1){
-						list_mask[i] = mask;
-					}
-					
-					current[0] = 0;
-					cur_dec = 0;
-				}
-				if(cur_dec == 2){
-					current[current_count] = 0;
-					str_to_mac(current, &last_mac);
-					current[0] = 0;
-					cur_dec = 0;
-				}
-				if(cur_dec == 3 && *parse == '\n'){
-					cur_dec = 0;
-				}
-				if(*parse == '\n'){
-					line++;
-				}
-				current_count = 0;
-				parse++;
-				continue;
-			}
-			
-			if(*parse == '#'){
-				cur_dec = 3;
-				parse++;
-				continue;
-			}
-			
-			if(*parse == '[' && cur_dec != 3){
-				cur_dec = 2;
-				parse++;
-				continue;
+			// nul character
+			if(*parse == ' ' || *parse == '\t'){
+				*parse = 0;
+				context = 1;
 			}
 
-			if(cur_dec != 2 && cur_dec != 3) cur_dec = 1;
-			
-			if(cur_dec == 1){
-				if(current_count == IP_ADRESS_MAX_LEN &&
-				   flag_mask == FALSE && *parse != '/'){
-					// syntax error
-					logmsg(LOG_ERR, "[%s %d] syntax error decoding IP at line %d",
-					       __FILE__, __LINE__, line);
+			// last caracter => quit
+			else if( *parse=='#' || *parse=='\n' || *parse=='\r'){
+				*parse = 0;
+				break;
+			}
+
+			// other caracters
+			else if(context == 1){
+				args[*arg] = parse;
+				(*arg)++;
+				// exceed args hard limit
+				if(arg_c == MAX_CONTEXT_ARGS || arg_n == MAX_ARGS){
+					logmsg(LOG_ERR,
+					       "file: \"%s\", line %d: exceed args hard limit (%d)",
+					       config[CF_AUTHFILE].valeur.string,
+							 ligne, MAX_ARGS);
 					exit(1);
 				}
-				if(current_count == IP_ADRESS_MAX_LEN + MASK_MAX_LEN + 1 &&
-				   flag_mask == TRUE){
-					logmsg(LOG_ERR, "[%s %d] syntax error decoding IP at line %d",
-					       __FILE__, __LINE__, line);
-					exit(1);
-				}
-				current[current_count] = *parse;
-				if(*parse == '/'){
-					flag_mask = TRUE;
-				}
-				current_count ++;
-				parse ++;
-				continue;
+				context = 0;
 			}
-			
-			if(cur_dec == 2){
-				if(current_count == MAC_ADRESS_MAX_LEN){
-					//syntax error
-					logmsg(LOG_ERR, "[%s %d] syntax error decoding IP at line %d",
-					       __FILE__, __LINE__, line);
-					exit(1);
-				}
-				current[current_count] = *parse;
-				current_count ++;
-				parse++;
-				continue;
-			}
-			
 			parse++;
 		}
-	} while(read_size == BUF_SIZE);
 
-	close(fd);
+		// context sanity check
+		if(arg_c > 0 && arg_c < 2){
+			logmsg(LOG_ERR,
+			       "file: \"%s\", line %d: insufficient arguments",
+			       config[CF_AUTHFILE].valeur.string,
+			       ligne);
+			exit(1);
+		}
+
+		// change context
+		if(arg_c > 0){
+		
+			// set interface
+			idcap = cap_get_interface(args[1]);
+			
+			// set mac address
+			if(str_to_mac(args[0], &mac) == -1){
+				logmsg(LOG_ERR,
+				       "file: \"%s\", line %d: mac addess error",
+				       config[CF_AUTHFILE].valeur.string,
+				       ligne);
+				exit(1);
+			}
+		}
+		
+		// add address
+		i = MAX_CONTEXT_ARGS;
+		while(i < arg_n){
+			parse = args[i];
+			str_ip = parse;
+			str_mask = NULL;
+			while(*parse != 0){
+				if(*parse == '/'){
+					*parse = 0;
+					parse++;
+					str_mask = parse;
+					break;
+				}
+				parse++;
+			}
+
+			// ip
+			ip.s_addr = inet_addr(str_ip);
+
+			// network address validation
+			mask = atoi(str_mask);
+			binmask.s_addr = dec_to_bin[mask];
+
+			// check network validation
+			if( (ip.s_addr & binmask.s_addr) != ip.s_addr){
+				logmsg(LOG_ERR, "[%s %i] error in config file \"%s\" "
+				       "at line %d: the value %s/%u are incorrect",
+				       __FILE__, __LINE__, config[CF_AUTHFILE].valeur.string,
+				       ligne, str_ip, str_mask);
+				exit(1);
+			}
+
+			// add this network value in hash
+			sens_add(&mac, ip, binmask, idcap);
+
+			i++;
+		}
+		
+		/*
+		ligne = 0;
+		while(ligne < arg_n){
+			printf("%s\n", args[ligne]);
+			ligne++;
+		}
+		printf("\n");
+		*/
+	}
+
+	fclose(fd);
 	
 	// sort list_mask
 	for(i=0; i<32; i++){
@@ -286,7 +298,8 @@ void sens_init(void) {
 }
 
 // add data to hash
-void sens_add(struct ether_addr *mac, struct in_addr ipb, struct in_addr mask){
+void sens_add(struct ether_addr *mac, struct in_addr ipb,
+              struct in_addr mask, struct capt *idcap){
 	u_int h;
 	struct pqt *mpqt;
 
@@ -328,7 +341,8 @@ void sens_reload(void){
 	sens_init();
 }
 
-int sens_exist(struct ether_addr *mac, struct in_addr ipb){
+int sens_exist(struct ether_addr *mac,
+               struct in_addr ipb, struct capt *idcap){
 	u_int h;
 	struct pqt *spqt;
 	struct in_addr *masks = &used_masks[0];

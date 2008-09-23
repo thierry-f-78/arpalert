@@ -14,13 +14,14 @@
 
 ARPALERTHOME="@prefix@"
 prog="arpalert"
+DEFAULT_PID_FILE="@localstatedir@/run/arpalert.pid"
 
 start() {
-        if [ ! -f $ARPALERTHOME/var/run/arpalert.lock ]; then
+        if [ ! -f $DEFAULT_PID_FILE ]; then
             echo -n $"Starting $prog: "
             daemon $ARPALERTHOME/sbin/arpalert
             RETVAL=$?
-            [ $RETVAL -eq 0 ] && touch $ARPALERTHOME/var/run/arpalert.lock
+            [ $RETVAL -eq 0 ] && touch "$DEFAULT_PID_FILE"
             echo
         fi
         return $RETVAL
@@ -33,7 +34,7 @@ stop() {
                 echo
         fi
         RETVAL=$?
-        [ $RETVAL = 0 ] && rm -rf $ARPALERTHOME/var/run/arpalert.lock
+        [ $RETVAL = 0 ] && rm -rf "$DEFAULT_PID_FILE"
         return $RETVAL
 }
 

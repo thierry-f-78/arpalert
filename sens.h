@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.h 201 2006-10-04 23:56:24Z  $
+ * $Id: sens.h 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -19,9 +19,11 @@ void sens_free(void);
 void sens_reload(void);
 
 // add sens to hash
-void sens_add(struct ether_addr *mac, struct in_addr ip, struct in_addr mask);
+void sens_add(struct ether_addr *mac, struct in_addr ip,
+              struct in_addr mask, struct capt *idcap);
 
 // test if sens exists
-int  sens_exist(struct ether_addr *mac, struct in_addr ip);
+int  sens_exist(struct ether_addr *mac, struct in_addr ip,
+                struct capt *idcap);
 
 #endif

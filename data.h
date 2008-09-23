@@ -1,20 +1,31 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.h 218 2006-10-05 17:21:55Z  $
+ * $Id: data.h 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
 #ifndef __DATA_H
 #define __DATA_H
 
+#include <pcap.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #ifdef __FreeBSD__
 #   define ETHER_ADDR_OCTET octet
 #else
 #   define ETHER_ADDR_OCTET ether_addr_octet
+#endif
+#if defined(sun) || defined(__sun) || defined(_sun_) || defined(__solaris__)
+#   define U_INT32_T uint32_t
+#   define U_INT16_T uint16_t
+#   define U_INT8_T uint8_t
+#else
+#   define U_INT32_T u_int32_t
+#   define U_INT16_T u_int16_t
+#   define U_INT8_T u_int8_t
 #endif
 
 #define NOT_EXIST 0
@@ -33,15 +44,32 @@
 #define NEW_MAC              8
 #define MAC_CHANGE           9
 
-typedef struct {
+// chain devices and idcap
+struct capt {
+	struct capt *next;
+	pcap_t *pcap;
+	char *device;
+	struct ether_addr mac;
+};
+
+struct data_pack {
 	struct ether_addr mac;
 	int flag;               /*0: @ok 1: @alert 2: new */
 	struct in_addr ip;
-	int timestamp;
-	int lastalert[7];
+	struct timeval timestamp;
+	struct timeval lastalert[7];
 	int request;
-	u_int32_t alerts;			/* bit field used for set detect exception */
-} data_pack;
+	U_INT32_T alerts;			/* bit field used for set detect exception */
+	struct capt *cap_id;
+	
+	// chain
+	struct data_pack *next_chain;
+	struct data_pack *prev_chain;
+	struct data_pack *next_mac;
+	struct data_pack *prev_mac;
+	struct data_pack *next_ip;
+	struct data_pack *prev_ip;
+};
 
 // set ip_change              0: 1st bit
 #define SET_IP_CHANGE(a)      a |= 0x00000001
@@ -68,11 +96,8 @@ void data_init(void);
 // clear all datas
 void data_reset(void);
 
-// dump all datas in file
-void data_dump(void);
-
-// clean all too old datas
-void data_clean(int);
+// call a dump of all datas
+void data_rqdump(void);
 
 // compare 2 mac adresses
 // return 0 if mac are equals
@@ -83,48 +108,29 @@ void data_clean(int);
 #define DATA_CPY(a, b) memcpy(a, b, sizeof(struct ether_addr))
 
 // add data to database with field
-void data_add_field(struct ether_addr *mac, int status, struct in_addr, u_int32_t);
+void data_add_field(struct ether_addr *mac, int status, struct in_addr, U_INT32_T, struct capt *idcap);
 
 // add data to database
-data_pack *data_add(struct ether_addr *mac, int status, struct in_addr);
+struct data_pack *data_add(struct ether_addr *mac, int status, struct in_addr, struct capt *idcap);
 
-// to change ip in data structur
-//void change_ip(data_pack *, u_int32_t);
+// timeout indexation
+void index_timeout(struct data_pack *);
 
 // force ip indexation
-void index_ip(data_pack *);
+void index_ip(struct data_pack *);
 
 // delete ip indexation
-void unindex_ip(u_int32_t);
+void unindex_ip(struct in_addr ip, struct capt *idcap);
 		  
 // check if data exist
 // return NULL if not exist
-data_pack *data_exist(struct ether_addr *);
+struct data_pack *data_exist(struct ether_addr *, struct capt *idcap);
 
 // check if ip exist
 // return NULL if not exist
-data_pack *data_ip_exist(struct in_addr ip);
+struct data_pack *data_ip_exist(struct in_addr ip, struct capt *idcap);
 
-// translate binary data mac to string data mac
-// void data_tomac(struct ether_addr, char *);
-#define MAC_TO_STR(a, b) \
-	sprintf((b), "%02x:%02x:%02x:%02x:%02x:%02x", \
-	        (a).ETHER_ADDR_OCTET[0], \
-	        (a).ETHER_ADDR_OCTET[1], \
-	        (a).ETHER_ADDR_OCTET[2], \
-	        (a).ETHER_ADDR_OCTET[3], \
-	        (a).ETHER_ADDR_OCTET[4], \
-	        (a).ETHER_ADDR_OCTET[5])
+// return next timeout and function to call for data section
+void *data_next(struct timeval *tv);
 
-// translate string data mac to binary data mac
-void str_to_mac(char *, struct ether_addr *);
-
-// translate string ip to binary ip
-u_int32_t str_to_ip(char *);
-
-// translate binary ip to string ip
-// void ip_to_str(char *, data_ip)
-#define IP_TO_STR(a, b) sprintf(b, "%u.%u.%u.%u", \
-                                a.bytes[3], a.bytes[2], \
-                                a.bytes[1], a.bytes[0]);
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 238 2006-10-06 11:07:14Z  $
+ * $Id: loadconfig.c 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -54,6 +54,10 @@ void config_load(int argc, char *argv[]){
 	config[CF_MACLIST].type = 0;
 	config[CF_MACLIST].attrib = "maclist file";
 	config[CF_MACLIST].valeur.string = NULL;
+	
+	config[CF_DUMP_INTER].type = 1;
+	config[CF_DUMP_INTER].attrib = "dump inter";
+	config[CF_DUMP_INTER].valeur.integer = 5;
 	
 	config[CF_LOGFILE].type = 0;
 	config[CF_LOGFILE].attrib = "log file";
@@ -334,6 +338,9 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
+					if(config[CF_IF].valeur.string != NULL){
+						free(config[CF_IF].valeur.string);
+					}
 					config[CF_IF].valeur.string = strdup(argv[i]);
 					break;
 	
@@ -343,6 +350,9 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
+					if(config[CF_LOCKFILE].valeur.string != NULL){
+						free(config[CF_LOCKFILE].valeur.string);
+					}
 					config[CF_LOCKFILE].valeur.string = strdup(argv[i]);
 					break;
 	
@@ -352,6 +362,9 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
+					if(config[CF_ACTION].valeur.string != NULL){
+						free(config[CF_ACTION].valeur.string);
+					}
 					config[CF_ACTION].valeur.string = strdup(argv[i]);
 					break;
 				
@@ -374,6 +387,9 @@ void config_load(int argc, char *argv[]){
 						usage();
 					}
 					i++;
+					if(config[CF_LEASES].valeur.string != NULL){
+						free(config[CF_LEASES].valeur.string);
+					}
 					config[CF_LEASES].valeur.string = strdup(argv[i]);
 					break;
 	

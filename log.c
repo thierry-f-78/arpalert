@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.c 275 2006-10-12 15:39:24Z  $
+ * $Id: log.c 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -48,8 +48,7 @@ void initlog(void){
 		openlog("arpalert", LOG_CONS, LOG_DAEMON);
 	}
 	#endif
-	if(config[CF_LOGFILE].valeur.string != NULL &&
-	   config[CF_LOGFILE].valeur.string[0] != 0){
+	if(config[CF_LOGFILE].valeur.string != NULL){
 		lf = fopen(config[CF_LOGFILE].valeur.string, "a");
 		if(lf == NULL){
 			fprintf(stderr, "[%s %d] fopen[%d]: %s\n",
@@ -70,10 +69,7 @@ void logmsg(int priority, const char *fmt, ...){
 		priority > config[CF_LOGLEVEL].valeur.integer ||
 
 		(
-			(
-				config[CF_LOGFILE].valeur.string == NULL ||
-				config[CF_LOGFILE].valeur.string[0] == 0
-			) &&
+			config[CF_LOGFILE].valeur.string == NULL &&
 			config[CF_DAEMON].valeur.integer == TRUE
 			#ifdef USE_SYSLOG
 			&& config[CF_USESYSLOG].valeur.integer == FALSE
@@ -84,7 +80,7 @@ void logmsg(int priority, const char *fmt, ...){
 	}
 
 	//get current tim 
-	tm = localtime(&current_time);
+	tm = localtime((time_t *)(&current_t.tv_sec));
 
 	va_start(ap, fmt);
 	vsnprintf(msg, 4096, fmt, ap);
@@ -96,8 +92,7 @@ void logmsg(int priority, const char *fmt, ...){
 	}
 	#endif
 
-	if(config[CF_LOGFILE].valeur.string != NULL &&
-	   config[CF_LOGFILE].valeur.string[0] != 0){
+	if(config[CF_LOGFILE].valeur.string != NULL){
 		fprintf(lf, "%s % 2d %02d:%02d:%02d arpalert: %s\n",
 		        mois[tm->tm_mon],
 		        tm->tm_mday,
@@ -110,7 +105,7 @@ void logmsg(int priority, const char *fmt, ...){
 	}
 
 	if(config[CF_DAEMON].valeur.integer == FALSE){
-		printf("%s % 2d %02d:%02d:%02d arpalert:  %s\n", 
+		printf("%s % 2d %02d:%02d:%02d arpalert: %s\n", 
 		        mois[tm->tm_mon],
 		        tm->tm_mday,
 		        tm->tm_hour,

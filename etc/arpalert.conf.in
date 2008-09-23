@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: arpalert.conf.in 220 2006-10-05 17:47:26Z  $
+# $Id: arpalert.conf.in 313 2006-10-16 12:54:40Z thierry $
 # 
 # Default config file
 # 
@@ -23,12 +23,15 @@ dump paquet = false
 # run the program as daemon ?
 daemon = false
 
+# minimun time to wait between two leases dump
+dump inter = 5
+
 #Configure the network for catch only arp request.
 #The detection type "new_mac" is desactived.
 #This mode is used for CPU saving if Arpalert is running on a router
 catch only arp = true
 
-# lesson this interface 
+# comma separated interfaces to lesson
 # if not precised, the soft select the first interface.
 # by default select the first interface encontered
 #interface = eth0
@@ -52,9 +55,6 @@ action on detect = ""
 mod on detect = ""
 # this chain is transfered to the init function of module loaded
 mod config = ""
-
-# permit to ignore packets whith the lessons interface mac address
-ignore me = true
 
 # script execution timeout (seconds)
 execution timeout = 10
@@ -117,6 +117,8 @@ alert on unauth request = false
 mod on unauth request = false
 # dont analyse arp request for unknow hosts (not in white list)
 ignore unknown sender = false
+# ignore arp request with mac adresse of the lessoned interfaces for the authorizations checks
+ignore me = true
 # ignore windows self test
 ignore self test = false
 # suspend time method:
@@ -138,4 +140,5 @@ mod on mac error = true
 
 # log if have too many arp request per seconds
 log flood = true
-alert on flood	 = false
+alert on flood	= true
+mod on flood = true

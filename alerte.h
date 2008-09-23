@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.h 59 2006-03-02 19:47:26Z thierry $
+ * $Id: alerte.h 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -12,6 +12,9 @@ void alerte(char *, char *, char *, int);
 
 // init memory structurs
 void alerte_init(void);
+
+// return the next timeout and the functionn to call
+void *alerte_next(struct timeval *tv);
 
 // check validity of all current alert scripts
 void alerte_check(void);

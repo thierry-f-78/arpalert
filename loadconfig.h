@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.h 220 2006-10-05 17:47:26Z  $
+ * $Id: loadconfig.h 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -58,6 +58,7 @@ enum {
 	CF_IGNORESELFTEST,
 	CF_UNAUTH_TO_METHOD,
 	CF_ONLY_ARP,
+	CF_DUMP_INTER,
 
 	// module path
 	CF_MOD_ALERT,

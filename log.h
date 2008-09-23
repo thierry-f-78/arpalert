@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: log.h 60 2006-03-02 19:51:25Z thierry $
+ * $Id: log.h 313 2006-10-16 12:54:40Z thierry $
  *
  */
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: serveur.c 182 2006-10-04 16:50:52Z  $
+ * $Id: serveur.c 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -90,7 +90,7 @@ void separe(void){
 	}
 	
 	// write pid in lock file
-	snprintf(str, 8, "%d\n", getpid());
+	snprintf(str, 8, "%d\n", (int)getpid());
 	write(fd, str, strlen(str));
 
 	// privilege separation

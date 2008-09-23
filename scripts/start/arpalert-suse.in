@@ -29,6 +29,8 @@
 ARPALERT_BIN="@sbindir@/arpalert"
 test -x $ARPALERT_BIN || exit 5
 
+DEFAULT_PID_FILE="@localstatedir@/run/arpalert.pid"
+
 . /etc/rc.status
 rc_reset
 
@@ -44,7 +46,7 @@ start() {
 stop() {
         echo -n "Stopping Arpalert Service"
         killproc -TERM $ARPALERT_BIN
-        rm -rf $ARPALERTHOME/var/run/arpalert.lock
+        rm -rf $DEFAULT_PID_FILE
         rc_status -v
 }
 

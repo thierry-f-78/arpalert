@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens_timeouts.c 216 2006-10-05 17:09:15Z  $
+ * $Id: sens_timeouts.c 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -10,35 +10,45 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include "arpalert.h"
 #include "data.h"
 #include "sens_timeouts.h"
 #include "log.h"
 #include "loadconfig.h"
+#include "func_time.h"
 
 /* hash table size ; this number must be primary number */
 #define HASH_SIZE 4096
 
 // hash function
 #define SENS_TIMEOUT_HASH(x, y) ({ \
-   u_int32_t a, b, c; \
-   a = (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[0]) ^ (*(u_int16_t*)&(x)->ETHER_ADDR_OCTET[4]); \
-   b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
+   U_INT32_T a, b, c; \
+   a = (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[0]) ^ \
+	    (*(U_INT16_T*)&(x)->ETHER_ADDR_OCTET[4]); \
+   b = a + ( ( (x)->ETHER_ADDR_OCTET[2] ^ \
+	    (x)->ETHER_ADDR_OCTET[3] ) << 16 ); \
    c = a ^ ( b >> 12 ); \
-   a = ((u_int16_t)(y)) ^ ( ((u_int32_t)(y)) >> 20 ) ^ ( ((u_int8_t)(y)) >> 12 ); \
+   a = ((U_INT16_T)(y)) ^ ( ((U_INT32_T)(y)) >> 20 ) ^ \
+	    ( ((U_INT8_T)(y)) >> 12 ); \
    ( a ^ c ) & 0xfff; \
 })
+
+extern int errno;
 
 // structurs
 struct tmouts {
 	struct ether_addr mac;
 	struct in_addr ip_d;
-	time_t last;
+	struct timeval last;
+	struct capt *idcap;
 	struct tmouts *prev_hash;
 	struct tmouts *next_hash;
 	struct tmouts *next_chain;
+	struct tmouts *prev_chain;
 };
 
 // data allocation
@@ -46,136 +56,162 @@ struct tmouts {
 struct tmouts tmouts_table[MAX_DATA];
 
 // hash
-struct tmouts *tmout_h[HASH_SIZE];
+struct tmouts tmout_h[HASH_SIZE];
 
-// free table root
-struct tmouts *free_start;
+// root of free nodes chain
+struct tmouts __free_start;
+struct tmouts *free_start = &__free_start;
 
-// used table root
-// first node used
-struct tmouts *used_start;
-// last node used
-struct tmouts *used_last;
+// root of used nodes chain
+struct tmouts __used_start;
+struct tmouts *used_start = &__used_start;
 
 // data_init
 void sens_timeout_init(void) {
 	int i;
 	struct tmouts *gen;
 
-	// set NULL pointers in tmout_h table
-	memset(&tmout_h, 0, HASH_SIZE * sizeof(struct tmouts *));
-	
-	free_start = &tmouts_table[0];
-	gen = free_start;
+	// set NULL pointers in tmout_h table and init
+	memset(&tmout_h, 0, HASH_SIZE * sizeof(struct tmouts));
+	i = 0;
+	while(i < HASH_SIZE){
+		gen = &tmout_h[i];
+		gen->prev_hash = gen;
+		gen->next_hash = gen;
+		i++;
+	}
 	
 	// generate free nodes list
-	for(i=1; i<MAX_DATA; i++){
-		gen->next_chain = &tmouts_table[i];
-		gen = gen->next_chain;
+	free_start->next_chain = free_start;
+	free_start->prev_chain = free_start;
+	i = 0;
+	while(i < MAX_DATA){
+		gen = &tmouts_table[i];
+		gen->next_chain = free_start->next_chain;
+		gen->prev_chain = free_start;
+		free_start->next_chain->prev_chain = gen;
+		free_start->next_chain = gen;
+		i++;
 	}
-	gen->next_chain = NULL;
-	used_start = NULL;
-	used_last = NULL;
+
+	// set used chain
+	used_start->next_chain = used_start;
+	used_start->prev_chain = used_start;
 }
 
 // add new timeout
-void sens_timeout_add(struct ether_addr *mac, struct in_addr ipb){
+void sens_timeout_add(struct ether_addr *mac, struct in_addr ipb,
+                      struct capt *idcap){
 	struct tmouts *new_tmout;
+	struct tmouts *base;
 	int hash;
 
 	// get free timeout node
-	if(free_start == NULL){
+	if(free_start->next_chain == free_start){
 		logmsg(LOG_WARNING,
-		       "[%s %d] No authorized request detection timeout avalaible, "
-		       "more than %d timeouts currently used",
+		       "[%s %d] No authorized request detection timeout "
+				 "avalaible, more than %d timeouts currently used",
 		       __FILE__, __LINE__, MAX_DATA);
 		return;
 	}
 
-	new_tmout = free_start;
-	free_start = new_tmout->next_chain;
+	// init values
+	new_tmout = free_start->next_chain;
 	DATA_CPY(&new_tmout->mac, mac);
+	new_tmout->idcap = idcap;
 	new_tmout->ip_d.s_addr = ipb.s_addr;
-	new_tmout->last = current_time;
+	new_tmout->last.tv_sec = current_t.tv_sec +
+	                         config[CF_ANTIFLOOD_INTER].valeur.integer;
+	new_tmout->last.tv_usec = current_t.tv_usec;
 
-	// add entrie in hash
+	// delete entrie fron free list
+	new_tmout->prev_chain->next_chain = new_tmout->next_chain;
+	new_tmout->next_chain->prev_chain = new_tmout->prev_chain;
+
+	// add entrie in hash 
 	hash = SENS_TIMEOUT_HASH(mac, ipb.s_addr);
-	new_tmout->next_hash = tmout_h[hash];
-	new_tmout->prev_hash = (struct tmouts *)&tmout_h[hash];
-	if(new_tmout->next_hash != NULL){
-		new_tmout->next_hash->prev_hash = new_tmout;
-	}
-	tmout_h[hash] = new_tmout;
-
-	// add timeout in chain list
-	new_tmout->next_chain = NULL;
-	if(used_last == NULL){
-		used_start = new_tmout;
-	} else {
-		used_last->next_chain = new_tmout;
-	}
-	used_last = new_tmout;
+	base = &tmout_h[hash];
+	base->next_hash->prev_hash = new_tmout;
+	new_tmout->next_hash = base->next_hash;
+	base->next_hash = new_tmout;
+	new_tmout->prev_hash = base;
+	
+	// add timeout at the end of chain list
+	used_start->prev_chain->next_chain = new_tmout;
+	new_tmout->prev_chain = used_start->prev_chain;
+	used_start->prev_chain = new_tmout;
+	new_tmout->next_chain = used_start;
 }
 
 // check if entrie are in timeout
-int sens_timeout_exist(struct ether_addr *mac, struct in_addr ipb){
-	int h;
-	struct tmouts *dst_tmout;
+int sens_timeout_exist(struct ether_addr *mac, struct in_addr ipb,
+                       struct capt *idcap){
+	int hash;
+	struct tmouts *base;
+	struct tmouts *find;
 
 	// if timeout entrie exist: is not expired
-	h = SENS_TIMEOUT_HASH(mac, ipb.s_addr);
-	dst_tmout = tmout_h[h];
+	hash = SENS_TIMEOUT_HASH(mac, ipb.s_addr);
+	base = &tmout_h[hash];
+	find = base->next_hash;
 
-	while(dst_tmout != NULL){
-		if(dst_tmout->ip_d.s_addr == ipb.s_addr &&
-		   DATA_CMP(&dst_tmout->mac, mac) == 0){
+	while(find != base){
+		if(find->ip_d.s_addr == ipb.s_addr &&
+		   find->idcap == idcap &&
+		   DATA_CMP(&(find->mac), mac) == 0){
 			return(TRUE);
 		}
-		dst_tmout = dst_tmout->next_hash;
+		find = find->next_hash;
 	}
 	return(FALSE);
 }
 
 // delete timeouts expires
 void sens_timeout_clean(void) {
-	struct tmouts *t_run;
+	struct tmouts *look;
+	struct tmouts *look_next;
 
-	t_run = used_start;
+	look = used_start->next_chain;
 
-	while(t_run != NULL && 
-	      current_time - t_run->last >= config[CF_ANTIFLOOD_INTER].valeur.integer){
-
-		// if previous data is hash base
-		if(t_run->prev_hash >= (struct tmouts *)&tmout_h[0] && 
-		   t_run->prev_hash <= (struct tmouts *)&tmout_h[HASH_SIZE - 1] ){
-			// update previous data
-			*(struct tmouts **)(t_run->prev_hash) = t_run->next_hash;
-		} else {
-			// update next data
-			t_run->prev_hash->next_hash = t_run->next_hash;
-		}
-
-		// update next data
-		if(t_run->next_hash != NULL){
-			t_run->next_hash->prev_hash = t_run->prev_hash;
-		}
-
-		// update used_start chain
-		used_start = t_run->next_chain;
-
-		// if used_start is empty, set used_last NULL 
-		if(used_start == NULL) {
-			used_last = NULL;
-		}
-
-		// insert last used at the beginig
-		// of the unused chain
-		t_run->next_chain = free_start;
-		free_start = t_run;
+	while(look != used_start && 
+	      time_comp(&current_t, &(look->last)) == BIGEST){
 
 		// get next
-		t_run = used_start;
+		look_next = look->next_chain;
+
+		// delete from hash
+		look->prev_hash->next_hash = look->next_hash;
+		look->next_hash->prev_hash = look->prev_hash;
 		
+		// delete from used list
+		look->prev_chain->next_chain = look->next_chain;
+		look->next_chain->prev_chain = look->prev_chain;
+		
+		// move the structur in free
+		free_start->next_chain->prev_chain = look;
+		look->next_chain = free_start->next_chain;
+		free_start->next_chain = look;
+		look->prev_chain = free_start;
+
+		// set next
+		look = look_next;
 	}
+}
+
+// get next timeout
+void *sens_timeout_next(struct timeval *tv){
+	struct tmouts *look;
+	
+	look = used_start->next_chain;
+	if(look != used_start){
+		tv->tv_sec = look->last.tv_sec;
+		tv->tv_usec = look->last.tv_usec;
+	}
+
+	else {
+		tv->tv_sec = -1;
+	}
+	
+	return sens_timeout_clean;
 }
 

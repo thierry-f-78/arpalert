@@ -1,3 +1,18 @@
+2.0.0   * info<at>arpalert<dot>org
+BETA      permit to listen more than one interface
+          port on solaris10
+          analyse arp reply (usefull if the arpalert is
+                             running on router)
+          format of config files updated for use of the ethernet 
+                   interfaces name
+          the option "ignore me" is only used for the "unauth_rq" alerts
+          new debug format (like tcpdump trace)
+          new core sheduler for more speed
+          all internal times in µseconds (in place of seconds)
+          change internal storage structurs for more speed
+          clean configure.in file
+          new defines for more code readability
+
 1.1.3   * info<at>arpalert<dot>org
           minor bugfix: harmonie of file arpalert.lock
           minor change in arpalert.8

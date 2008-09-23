@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2005-2010 Thierry FOURNIER
-# $Id: Makefile.in 282 2006-10-12 19:56:28Z  $
+# $Id: Makefile.in 313 2006-10-16 12:54:40Z thierry $
 # 
 
 prefix = @prefix@
@@ -25,7 +25,7 @@ src_dir = .
 CC = @CC@
 CFLAGS = -Wall -O2  \
          -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" \
-         -DPID_FILE=\"$(lock_dir)/arpalert.lock\"
+         -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
 LIBS = @LIBS@
 OBJECT_LIST = \
 	$(src_dir)/arpalert.o \
@@ -38,6 +38,8 @@ OBJECT_LIST = \
 	$(src_dir)/alerte.o \
 	$(src_dir)/sens.o \
 	$(src_dir)/sens_timeouts.o \
+	$(src_dir)/func_time.o \
+	$(src_dir)/func_str.o \
 	$(src_dir)/capture.o
 
 arpalert: $(OBJECT_LIST)
@@ -46,7 +48,13 @@ arpalert: $(OBJECT_LIST)
 loadmodule.o: loadmodule.c config.h log.h loadmodule.h loadconfig.h
 	$(CC) $(CFLAGS) -c -o loadmodule.o $(src_dir)/loadmodule.c
 
-alerte.o: alerte.c config.h alerte.h log.h loadconfig.h errmsg.h serveur.h
+func_str.o: func_str.c config.h
+	$(CC) $(CFLAGS) -c -o func_str.o $(src_dir)/func_str.c
+
+func_time.o: func_time.c config.h
+	$(CC) $(CFLAGS) -c -o func_time.o $(src_dir)/func_time.c
+
+alerte.o: alerte.c config.h alerte.h log.h loadconfig.h serveur.h
 	$(CC) $(CFLAGS) -c -o alerte.o $(src_dir)/alerte.c
 
 arpalert.o: arpalert.c config.h loadconfig.h log.h data.h maclist.h capture.h serveur.h \
@@ -100,19 +108,19 @@ install:
 	then \
 	  > $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  echo "# white list" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
-	  echo "Maclist file = $(config_dir)/maclist.allow" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "maclist file = $(config_dir)/maclist.allow" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
 	  echo "# black list" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
-	  echo "Maclist alert file = $(config_dir)/maclist.deny" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "maclist alert file = $(config_dir)/maclist.deny" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
 	  echo "# dump file" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
-	  echo "Maclist leases file = $(leases_dir)/arpalert.leases" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "maclist leases file = $(leases_dir)/arpalert.leases" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
 	  echo "# list of authorized request" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
-	  echo "#Auth request file = $(config_dir)/authrq.conf" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "#auth request file = $(config_dir)/authrq.conf" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
 	  echo "# log file" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
@@ -120,38 +128,11 @@ install:
 	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
 	  echo "# pid file" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
-	  echo "Lock file = $(lock_dir)/arpalert.lock" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
+	  echo "lock file = $(lock_dir)/arpalert.pid" >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  echo >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	  \
 	  cat etc/arpalert.conf.in  >> $(DESTDIR)$(config_dir)/arpalert.conf; \
 	else \
 	  /bin/true; \
 	fi
-
-pdf: arpalert-sources.pdf
-
-arpalert-sources.pdf: alerte.h config.h errmsg.h log.h sens.h serveur.h capture.h data.h \
-                      loadconfig.h  maclist.h  sens_timeouts.h alerte.c capture.c loadconfig.c \
-                      maclist.c sens_timeouts.c arpalert.c data.c log.c sens.c serveur.c
-	enscript -j -E --header "\$$n||Page $$% of $$=" --color -T 3 -p - *.c *.h | ps2pdf - arpalert-sources.pdf
-
-stats:
-	echo; \
-	for files in $$(ls *.c; ls *.h); \
-	do \
-	printf "%15s:% 5d lines\n" $$files "$$( cat $$files | wc -l )"; \
-	done | sort -n +1; \
-	echo; \
-	printf "%15s:% 5d lines\n" "Total" "$$( ( cat *.c ; cat *.h ) | wc -l )"; \
-	echo
-
-dependencies:
-	echo; \
-	for files in $$(ls *.c); \
-	do \
-	printf \
-	"%15s: %s\n" \
-	$$files "$$(cat $$files | grep "#include \"" | sed -e "s/#include \"//; s/\"//" | xargs echo )"; \
-	done; echo; \
-							
 

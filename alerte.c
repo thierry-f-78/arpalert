@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.c 278 2006-10-12 16:05:41Z  $
+ * $Id: alerte.c 313 2006-10-16 12:54:40Z thierry $
  *
  */
 
@@ -13,13 +13,14 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 
 #include "arpalert.h"
 #include "alerte.h"
 #include "log.h"
 #include "loadconfig.h"
-#include "errmsg.h"
 #include "serveur.h"
+#include "func_time.h"
 
 // alert levels
 const char *alert[] = {
@@ -33,7 +34,7 @@ extern int errno;
 
 struct t_pid {
 	int pid;
-	time_t time;
+	struct timeval time;
 	struct t_pid *next;
 	struct t_pid *prev;
 };
@@ -56,6 +57,12 @@ void alerte_kill_pid(int);
 void alerte_init(void){
 	int counter;
 	struct t_pid *assign;
+
+	// if the script is not specified, quit function
+	if(config[CF_ACTION].valeur.string == NULL ||
+	   config[CF_ACTION].valeur.string[0] == 0){
+		return;
+	}
 
 	// init used pid chain
 	atomic_add = FALSE;
@@ -101,7 +108,9 @@ void addpid(int pid){
 	// set values
 	assign = unused_pid.next;
 	assign->pid = pid;
-	assign->time = current_time;
+	assign->time.tv_sec = current_t.tv_sec +
+	                      config[CF_TIMEOUT].valeur.integer;
+	assign->time.tv_usec = current_t.tv_usec;
 
 	// delete from the unused list
 	unused_pid.next->next->prev = &unused_pid;
@@ -114,8 +123,10 @@ void addpid(int pid){
 	used_pid.prev = assign;
 
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] Add pid %i at time %d", __FILE__, __LINE__,
-	       assign->pid, (unsigned int)assign->time);
+	logmsg(LOG_DEBUG,
+	       "[%s %i] Add pid %i",
+	       __FILE__, __LINE__,
+	       assign->pid);
 	#endif
 
 	atomic_add = FALSE;
@@ -159,7 +170,9 @@ void alerte_kill_pid(int signal){
 	int pid;
 
 	#ifdef DEBUG
-	logmsg(LOG_DEBUG, "[%s %i] entering alerte_kill_pid()", __FILE__, __LINE__); 
+	logmsg(LOG_DEBUG,
+	       "[%s %i] entering alerte_kill_pid()",
+	       __FILE__, __LINE__); 
 	#endif
 
 	while(TRUE){
@@ -178,7 +191,9 @@ void alerte_kill_pid(int signal){
 		}
 	
 		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] pid [%i] ended", __FILE__, __LINE__, pid); 
+		logmsg(LOG_DEBUG,
+		       "[%s %i] pid [%i] ended",
+		       __FILE__, __LINE__, pid); 
 		#endif
 		delpid(pid);
 	}
@@ -194,10 +209,23 @@ void alerte_check(void){
 	struct t_pid *check;
 	struct t_pid *temp_check;
 
+	// if the script is not specified, quit function
+	if(config[CF_ACTION].valeur.string == NULL ||
+	   config[CF_ACTION].valeur.string[0] == 0){
+		return;
+	}
+
+	#ifdef DEBUG
+	logmsg(LOG_DEBUG,
+	       "[%s %d] cleanning processes",
+	       __FILE__, __LINE__);
+	#endif
+
 	// if no current recorded pid
 	if(used_pid.next == &used_pid){
 		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] no pid in pid list", __FILE__, __LINE__);
+		logmsg(LOG_DEBUG, "[%s %i] no pid in pid list",
+		       __FILE__, __LINE__);
 		#endif
 		return;
 	}
@@ -211,16 +239,9 @@ void alerte_check(void){
 	
 		// look if process's running
 		return_code = waitpid(check->pid, &status, WNOHANG);
-		#ifdef DEBUG
-		logmsg(LOG_DEBUG, "[%s %i] analysing pid %i: remaining time: %i, "
-		       "return code = %i",
-		       __FILE__, __LINE__, check->pid,
-		       config[CF_TIMEOUT].valeur.integer - ( current_time - check->time ), 
-				 return_code);
-		#endif
 
-		// if time exceeded
-		if(current_time - check->time >= config[CF_TIMEOUT].valeur.integer && 
+		// if time exceed
+		if(time_comp(&current_t, &(check->time)) == 1 &&
 		   return_code == 0 ) {
 			logmsg(LOG_ERR, "[%s %i] kill pid %i: running time exceeded",
 			       __FILE__, __LINE__, check->pid);
@@ -266,7 +287,9 @@ void alerte(char *mac, char *ip, char *parm_supp, int alert_level){
 	}
 
 	if(unused_pid.next == &unused_pid){
-		logmsg(LOG_ERR, "[%s %i] Exceed maximun process", __FILE__, __LINE__);
+		logmsg(LOG_ERR,
+		       "[%s %i] Exceed maximun process",
+		       __FILE__, __LINE__);
 		return;
 	}
 
@@ -285,13 +308,40 @@ void alerte(char *mac, char *ip, char *parm_supp, int alert_level){
 		return;
 	}
 
-	return_code = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string,
-	                     mac, ip, parm_supp, alert[alert_level], (char*)0);
+	return_code = execlp(config[CF_ACTION].valeur.string,
+	                     config[CF_ACTION].valeur.string,
+	                     mac, ip, parm_supp,
+	                     alert[alert_level], (char*)0);
 	if(return_code < 0){
-		logmsg(LOG_ERR, "[%s %i] Error at execution of script [%s], error %i: %s",
-		       __FILE__, __LINE__, config[CF_ACTION].valeur.string, errno, errmsg[errno]);
+		logmsg(LOG_ERR,
+		       "[%s %i] Error at execution of script "
+		       "[%s], error %i: %s",
+		       __FILE__, __LINE__,
+		       config[CF_ACTION].valeur.string, errno, strerror(errno));
 		exit(1);
 	}
 	exit(0);
+}
+
+// return the next active timeout
+void *alerte_next(struct timeval *tv){
+	struct t_pid *check;
+
+	// if the script is not specified, quit function
+	if(config[CF_ACTION].valeur.string == NULL ||
+	   config[CF_ACTION].valeur.string[0] == 0){
+		tv->tv_sec = -1;
+		return NULL;
+	}
+	// if no pid running return NULL
+	if(used_pid.next == &used_pid){
+		tv->tv_sec = -1;
+		return NULL;
+	}
+
+	check = used_pid.next;
+	tv->tv_sec = check->time.tv_sec;
+	tv->tv_usec = check->time.tv_usec;
+	return alerte_check;
 }
 

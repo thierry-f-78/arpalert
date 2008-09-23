@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadmodule.c 208 2006-10-05 11:41:52Z  $
+ * $Id: loadmodule.c 313 2006-10-16 12:54:40Z  $
  *
  */
 
@@ -30,6 +30,14 @@ void *module;
 void module_load(void){
 	struct stat entinfo;
 	const char *tmp;
+
+	module = NULL;
+
+	// check the parameter
+	if(config[CF_MOD_ALERT].valeur.string == NULL ||
+	   config[CF_MOD_ALERT].valeur.string[0] == 0){
+		return;
+	}
 
 	// teste si c'est un fichier
 	if(stat(config[CF_MOD_ALERT].valeur.string, &entinfo) == -1){
@@ -88,6 +96,7 @@ void module_load(void){
 void module_unload(void){
 	const char *tmp;
 
+	if(module == NULL) return;
 	if(mod_unload != NULL) mod_unload();
 
 	dlclose(module);
@@ -108,7 +117,9 @@ void alerte_mod(struct ether_addr *mac_sender,
 	void *args[4];
 	int parm_num = 3;
 
-	if(config[CF_MOD_ALERT].valeur.string == NULL){
+	// check the parameter
+	if(config[CF_MOD_ALERT].valeur.string == NULL ||
+	   config[CF_MOD_ALERT].valeur.string[0] == 0){
 		return;
 	}
 
