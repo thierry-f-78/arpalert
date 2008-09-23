@@ -27,15 +27,15 @@ void maclist_file(char *file, int level){
 	FILE *fp;	/* pointeur du fichier */
 	char buf;	/* pointeur sur la ligne lue */
 	unsigned char key[17];
-	unsigned char ip[15];
+	unsigned char ip[16];
 	int ip_32;
 	int qui;
 	int p, ligne, car;
 	data_mac mac;
 
 	memset(key, 0, 17);
-	memset(ip, 0, 15);
-	
+	memset(ip, 0, 16);
+
 	/* ouvrir le fichier */
 	fp = fopen(file, "r");
 	if(fp == NULL){
@@ -63,13 +63,12 @@ void maclist_file(char *file, int level){
 			ip_32 = data_toip(ip);
 			data_add(&mac, level, ip_32);
 			
-			for(p=0; p<14; p++)ip[p]=0;
 			p=0;
 			qui=1;
 			car=0;
 			ligne++;
 			memset(key, 0, 17);
-			memset(ip, 0, 15);
+			memset(ip, 0, 16);
 			continue;
 		}
 

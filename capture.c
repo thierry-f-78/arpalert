@@ -87,7 +87,7 @@ void cap_snif(void){
 		me.octet[4] = ifr.ifr_addr.sa_data[4];
 		me.octet[5] = ifr.ifr_addr.sa_data[5];
 
-		data_tomac(me, &ethernet);
+		data_tomac(me, ethernet);
 		strncat(filtre, " not ether host ", 1024);
 		strncat(filtre, ethernet , 1024);
 	}
@@ -337,6 +337,21 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 							#endif
 						}
 					}
+				} else if(data->ip.ip == 0 && ip_32.ip != 0) {
+					if(config[CF_LOGNEW].valeur.integer == TRUE){
+						logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new", seq, smacseth, ip);
+					}
+			
+					if(config[CF_ALRNEW].valeur.integer == TRUE){
+						ret = alerte(smacseth, ip, (unsigned char *)"", 3);
+						#ifdef DEBUG
+						if(ret > 0){
+							logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+						}
+						#endif
+					}
+					
+					flagdump = TRUE;
 				}
 				data[0].ip.ip = ip_32.ip;
 				flagdump = TRUE;
@@ -405,21 +420,39 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 	
 	/* si pas d'adresse identifiée */
 	if(dataeth == NULL){
-		if(config[CF_LOGNEW].valeur.integer == TRUE){
-			logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new", seq, smacseth, ip);
-		}
-
-		if(config[CF_ALRNEW].valeur.integer == TRUE){
-			ret = alerte(smacseth, ip, (unsigned char *)"", 3);
-			#ifdef DEBUG
-			if(ret > 0){
-				logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+		if(ip_32.ip==0){
+			if(config[CF_LOGNEW].valeur.integer == TRUE){
+				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new_mac", seq, smacseth, ip);
 			}
-			#endif
+	
+			if(config[CF_ALRNEW].valeur.integer == TRUE){
+				ret = alerte(smacseth, ip, (unsigned char *)"", 8);
+				#ifdef DEBUG
+				if(ret > 0){
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+				}
+				#endif
+			}
+			
+			data_add(&maceth, APPEND, ip_32.ip);
+			flagdump = TRUE;
+		} else {
+			if(config[CF_LOGNEW].valeur.integer == TRUE){
+				logmsg(LOG_NOTICE, "seq=%d, mac=%s, ip=%s, type=new", seq, smacseth, ip);
+			}
+	
+			if(config[CF_ALRNEW].valeur.integer == TRUE){
+				ret = alerte(smacseth, ip, (unsigned char *)"", 3);
+				#ifdef DEBUG
+				if(ret > 0){
+					logmsg(LOG_DEBUG, "[%s %i] Forked with pid: %i", __FILE__, __LINE__, ret);
+				}
+				#endif
+			}
+			
+			data_add(&maceth, APPEND, ip_32.ip);
+			flagdump = TRUE;
 		}
-		
-		data_add(&maceth, APPEND, ip_32.ip);
-		flagdump = TRUE;
 	}
 	
 	/* si entrée ajoutée mais non reference */

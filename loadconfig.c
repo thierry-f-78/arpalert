@@ -339,7 +339,7 @@ void miseenmemoire(char *buf){
 		fprintf(stderr, "%i: erreur dans le fichier de config a la ligne: %s\n", __LINE__, buf);
 		exit(1);
 	}
-	if(*(m_eq-1)!=' '){
+	if(*(m_eq+1)!=' '){
 		fprintf(stderr, "%i: erreur dans le fichier de config a la ligne: %s\n", __LINE__, buf);
 		exit(1);
 	}
