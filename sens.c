@@ -45,7 +45,7 @@ void sens_init(void) {
 	if(fp == NULL){
 		logmsg(LOG_ERR, "[%s %i] don't found file %s", __FILE__, __LINE__,
 			config[CF_AUTHFILE].valeur.string);
-		return;
+		exit(1);
 	}
 	
 	buf = buffer;
@@ -83,7 +83,9 @@ void sens_init(void) {
 		dec=0;
 		memset(ip, 0, 16);
 		while(1){
-			if((buf[i]>='0' && buf[i]<='9')||(buf[i]>='a' && buf[i]<='f')||buf[i]=='.'||buf[i]==':'){
+			if((buf[i]>='0' && buf[i]<='9') || \
+			  (buf[i]>='a' && buf[i]<='f') || \
+			  buf[i]=='.' || buf[i]==':'){
 				ip[dec]=buf[i];
 				if(dec>17){
 					logmsg(LOG_ERR, 

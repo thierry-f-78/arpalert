@@ -31,7 +31,7 @@ OBJECT_LIST = \
 	obj/capture.o
 
 #DEFS = -DCONFIG_FILE=\"@sysconfdir@/arpalert/arpalert.conf\"
-DEFS = -DCONFIG_FILE=\"${config_dir}/arpalert.conf\" -DPID_FILE=\"${lock_dir}/run/arpalert.pid\"
+DEFS = -DCONFIG_FILE=\"${config_dir}/arpalert.conf\" -DPID_FILE=\"${lock_dir}/arpalert.pid\"
 
 arpalert: ${OBJECT_LIST}
 	${CC} ${FLAGS} -g -O2 -o obj/arpalert ${OBJECT_LIST} ${FLAGS} ${LIBS} ${DEFS}
@@ -79,15 +79,20 @@ install:
 	test ! -f ${config_dir}/maclist.deny  && > ${config_dir}/maclist.deny  || /bin/true
 	if test ! -f ${config_dir}/arpalert.conf; \
 	then \
-		> ${config_dir}/arpalert.conf; \
-		echo "Maclist file                    = ${config_dir}/maclist.allow" >> ${config_dir}/arpalert.conf; \
-		echo "Maclist alert file              = ${config_dir}/maclist.deny" >> ${config_dir}/arpalert.conf; \
-		echo "Maclist leases file             = ${leases_dir}/arpalert.leases" >> ${config_dir}/arpalert.conf; \
-		echo "auth request file               = ${config_dir}/authrq.conf" >> ${config_dir}/arpalert.conf; \
-		echo >> ${config_dir}/arpalert.conf; \
-		echo "Lock file                       = ${lock_dir}/arpalert.lock" >> ${config_dir}/arpalert.conf; \
-		cat etc/arpalert.conf.in  >> ${config_dir}/arpalert.conf; \
+	  > ${config_dir}/arpalert.conf; \
+	  echo "# white list" >> ${config_dir}/arpalert.conf; \
+	  echo "Maclist file = ${config_dir}/maclist.allow" >> ${config_dir}/arpalert.conf; \
+	  echo "# black list" >> ${config_dir}/arpalert.conf; \
+	  echo "Maclist alert file = ${config_dir}/maclist.deny" >> ${config_dir}/arpalert.conf; \
+	  echo "# dump file" >> ${config_dir}/arpalert.conf; \
+	  echo "Maclist leases file = ${leases_dir}/arpalert.leases" >> ${config_dir}/arpalert.conf; \
+	  echo "# list of authorized request" >> ${config_dir}/arpalert.conf; \
+	  echo "auth request file = ${config_dir}/authrq.conf" >> ${config_dir}/arpalert.conf; \
+	  echo >> ${config_dir}/arpalert.conf; \
+	  echo "# pid file" >> ${config_dir}/arpalert.conf; \
+	  echo "Lock file = ${lock_dir}/arpalert.lock" >> ${config_dir}/arpalert.conf; \
+	  cat etc/arpalert.conf.in  >> ${config_dir}/arpalert.conf; \
 	else \
-		/bin/true; \
+	  /bin/true; \
 	fi
 

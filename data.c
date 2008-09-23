@@ -131,6 +131,7 @@ void data_add(data_mac *mac, int status,  int ip){
 		(*libre).data.flag = status;
 		(*libre).data.ip.ip = ip;
 		(*libre).data.timestamp = time(NULL);
+		(*libre).data.request = 0;
 		(*libre).next = NULL;
 		*add = libre;
 		#ifdef DEBUG
@@ -179,10 +180,12 @@ void data_dump(void){
 						&& del[0].data.flag == APPEND
 					)
 				){
-					snprintf(msg, 128, "%s %i.%i.%i.%i\n", s_mac, 
-						del[0].data.ip.bytes[0], del[0].data.ip.bytes[1], 
-						del[0].data.ip.bytes[2], del[0].data.ip.bytes[3]);
-					fputs(msg, fp);
+					if(del[0].data.ip.ip != 0){
+						snprintf(msg, 128, "%s %i.%i.%i.%i\n", s_mac, 
+							del[0].data.ip.bytes[0], del[0].data.ip.bytes[1], 
+							del[0].data.ip.bytes[2], del[0].data.ip.bytes[3]);
+						fputs(msg, fp);
+					}
 				}
 				del = (*del).next;
 			} else {

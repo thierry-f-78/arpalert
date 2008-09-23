@@ -76,7 +76,7 @@ void config_load(void){
 
 	config[CF_ABUS].type = 1;
 	strncpy(config[CF_ABUS].attrib, "max request", 512);
-	config[CF_ABUS].valeur.integer = 1048576;
+	config[CF_ABUS].valeur.integer = 1000000;
 	
 	config[CF_MAXENTRY].type = 1;
 	strncpy(config[CF_MAXENTRY].attrib, "max entry", 512);
@@ -113,11 +113,11 @@ void config_load(void){
 	config[CF_ALRDENY].type = 2;
 	strncpy(config[CF_ALRDENY].attrib, "alert on deny address", 512);
 	config[CF_ALRDENY].valeur.integer = TRUE;
-	
+
 	config[CF_LOGNEW].type = 2;
 	strncpy(config[CF_LOGNEW].attrib, "log new address", 512);
 	config[CF_LOGNEW].valeur.integer = TRUE;
-	
+
 	config[CF_ALRNEW].type = 2;
 	strncpy(config[CF_ALRNEW].attrib, "alert on new address", 512);
 	config[CF_ALRNEW].valeur.integer = TRUE;
@@ -129,7 +129,7 @@ void config_load(void){
 	config[CF_LOGIP].type = 2;
 	strncpy(config[CF_LOGIP].attrib, "log ip change", 512);
 	config[CF_LOGIP].valeur.integer = TRUE;
-	
+
 	config[CF_AUTHFILE].type = 0;
 	strncpy(config[CF_AUTHFILE].attrib, "auth request file", 512);
 	config[CF_AUTHFILE].valeur.string[0] = 0;
@@ -141,7 +141,7 @@ void config_load(void){
 	config[CF_ALERT_UNAUTH_RQ].type = 2;
 	strncpy(config[CF_ALERT_UNAUTH_RQ].attrib, "alert on unauth request", 512);
 	config[CF_ALERT_UNAUTH_RQ].valeur.integer = TRUE;
-	
+
 	config[CF_LOG_ABUS].type = 2;
 	strncpy(config[CF_LOG_ABUS].attrib, "log request abus", 512);
 	config[CF_LOG_ABUS].valeur.integer = TRUE;
@@ -149,11 +149,27 @@ void config_load(void){
 	config[CF_ALERT_ABUS].type = 2;
 	strncpy(config[CF_ALERT_ABUS].attrib, "alert on request abus", 512);
 	config[CF_ALERT_ABUS].valeur.integer = TRUE;
-	
+
+	config[CF_LOG_BOGON].type = 2;
+	strncpy(config[CF_LOG_BOGON].attrib, "log mac error", 512);
+	config[CF_LOG_BOGON].valeur.integer = TRUE;
+
+	config[CF_ALR_BOGON].type = 2;
+	strncpy(config[CF_ALR_BOGON].attrib, "alert on mac error", 512);
+	config[CF_ALR_BOGON].valeur.integer = TRUE;
+
+	config[CF_IGNORE_UNKNOW].type = 2;
+	strncpy(config[CF_IGNORE_UNKNOW].attrib, "ignore unknow sender", 512);
+	config[CF_IGNORE_UNKNOW].valeur.integer = TRUE;
+
+	config[CF_DUMP_PAQUET].type = 2;
+	strncpy(config[CF_DUMP_PAQUET].attrib, "dump paquet", 512);
+	config[CF_DUMP_PAQUET].valeur.integer = FALSE;
+
 	/* cherche / recharge les parametres de la ligne de commande */
 	optind = 0;
 	strncpy(config_file, CONFIG_FILE, 2048);
-	while ((c = getopt(margc, margv, "f:i:p:e:dD:l:v")) != EOF) {
+	while ((c = getopt(margc, margv, "f:i:p:e:dwD:l:v")) != EOF) {
 		switch (c) {
 			case 'f': 
 				strncpy(config_file, optarg, 2048);
@@ -189,6 +205,10 @@ void config_load(void){
 
 			case 'v':
 				dump = 1;
+			break;
+			
+			case 'w':
+				config[CF_DUMP_PAQUET].valeur.integer = TRUE;
 			break;
 			
 			case 'h':

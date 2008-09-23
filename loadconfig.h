@@ -45,8 +45,12 @@
 #define CF_ALERT_UNAUTH_RQ	28
 #define CF_LOG_ABUS		29
 #define CF_ALERT_ABUS		30
+#define CF_LOG_BOGON		31
+#define CF_ALR_BOGON		32
+#define CF_IGNORE_UNKNOW	33
+#define CF_DUMP_PAQUET		34
 
-#define NUM_PARAMS  		31
+#define NUM_PARAMS  		35
 
 int flagdump;
 

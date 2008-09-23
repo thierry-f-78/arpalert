@@ -32,6 +32,8 @@ void maclist_file(char *file, int level){
 	int p, ligne, car;
 	data_mac mac;
 
+	memset(key, 0, 17);
+	memset(ip, 0, 15);
 	
 	/* ouvrir le fichier */
 	fp = fopen(file, "r");
@@ -65,6 +67,8 @@ void maclist_file(char *file, int level){
 			qui=1;
 			car=0;
 			ligne++;
+			memset(key, 0, 17);
+			memset(ip, 0, 15);
 			continue;
 		}
 
@@ -82,7 +86,7 @@ void maclist_file(char *file, int level){
 		
 		/* copie les données considérées comme ip */
 		if(qui==2){
-			if(p>=14){
+			if(p>=15){
 				logmsg(LOG_ERR, "[%s %i] IP address error at line %i character %i", __FILE__, __LINE__, ligne, car);
 				exit(1);
 			}

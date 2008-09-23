@@ -1,3 +1,8 @@
+0.4.5: invalid mac adress detection by ethernet arp
+       different adress in ethernet header and arp request detection
+
+0.4.4: use mac adress in place of ip adress in request detection
+
 0.4.3: permit to ignore a machine in request detection
 
 0.4.2: add specific request detection

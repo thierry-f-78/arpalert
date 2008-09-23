@@ -73,6 +73,8 @@ int main(int argc, char **argv){
 
 	/* boucle principale */
 	cap_snif();
+	
+	exit(1);
 }
 
 void die(int signal){

@@ -1,30 +1,75 @@
+# niveau d'alerte
 log level 			= 6
 
-#Action on detect		= "/root/test.sh"
-#Action on detect		= "/root/test2.sh"
+# only for debugging: this dump paquet received on standard outpu
+dump paquet			= false
+
+# run the program as daemon ?
+daemon				= false
+
+# lesson this interface 
+# if not precised, the soft select the first interface.
+interface			= eth0
+
+# script launch on each detection
+# parameters are: "mac adress of requestor" "ip of requestor" "supp. parm." "type of alert"
+# type of alert:
+# 0: ip change
+# 1: mac address only detected but not in whithe list
+# 2: mac address in black list
+# 3: new mac address
+# 4: unauthorized arp request
+# 5: abusive number of arp request detected 
+# 6: ethernet mac address different from arp mac address
+Action on detect		= ""
+
+# script execution timeout (seconds)
 Execution timeout		= 10
-max alert			= 15
-Max request			= 50
 
-Dump black list			= FALSE
-Dump white list			= FALSE
-Dump new address		= TRUE
+# maximun simultaneous lanched script
+max alert			= 20
 
-Mac timeout			= 88888888888830
-Max entry               	= 100
+# what data are dumped in leases file
+Dump black list			= false
+Dump white list			= false
+Dump new address		= true
 
-log referenced address		= FALSE
-alert on referenced address	= FALSE
-log deny address		= TRUE
-alert on deny address		= TRUE
-log new address			= TRUE
-alert on new address		= TRUE
-log ip change			= TRUE
-alert on ip change      	= TRUE
-log unauth request		= TRUE
-alert on unauth request		= TRUE
-log unauth request		= TRUE
-alert on unauth request		= TRUE
-log request abus		= TRUE
-alert on request abus		= TRUE
-				    
+
+# after this time a mac adress is removed from memory (seconds) (default 1 month)
+Mac timeout			= 259200
+
+# after this limit the memory hash is cleaned (protect to arp flood)
+Max entry               	= 1000000
+
+# log if the adress is referenced in hash but is not in white list
+log referenced address		= false
+alert on referenced address	= false
+
+# log if the mac adress is in black list
+log deny address		= true
+alert on deny address		= true
+
+# log if the adress isn't referenced
+log new address			= true
+alert on new address		= true
+
+# log if the ip adress id different from the last arp request with the same mac adress
+log ip change			= true
+alert on ip change      	= true
+
+# unauthorized arp request:
+# log all the request not authorized in auth file
+log unauth request		= true
+alert on unauth request		= true
+# dont analyse arp request for unknow hosts (not in white list)
+ignore unknow sender		= true
+
+# log if the number of request per seconds are > "max request"
+log request abus		= true
+alert on request abus		= true
+# maximun request authorized by second
+Max request			= 1000000
+
+# log if the ethernet mac address are different than the arp amc address (only for requestor)
+log mac error			= true
+alert on mac error		= true

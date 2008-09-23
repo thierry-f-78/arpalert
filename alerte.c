@@ -171,7 +171,7 @@ void alerte_check(void){
 }
 
 /* genere une alerte */
-int alerte(unsigned char *mac, unsigned char *ip, int alert_level){
+int alerte(unsigned char *mac, unsigned char *ip, unsigned char *rq, int alert_level){
 	int pid;
 	int ret;
 	char alert[5];
@@ -207,7 +207,7 @@ int alerte(unsigned char *mac, unsigned char *ip, int alert_level){
 	
 	snprintf(alert, 5, "%i", alert_level);
 	ret = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string,
-		mac, ip, alert, NULL);
+		mac, ip, rq, alert, NULL);
 	if(ret < 0){
 		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s", __FILE__, __LINE__,
 			config[CF_ACTION].valeur.string, errno, errmsg[errno]);
