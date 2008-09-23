@@ -1,13 +1,29 @@
 #include <pcap.h>
-#include <pcap-bpf.h>
 #include <stdlib.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <net/ethernet.h>
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
 #include <time.h>
+#include <fcntl.h>
 #include <string.h>
+#include <pwd.h>
+#include <unistd.h>
+#include <grp.h>
+#include <stdio.h>
+
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#include <net/if_arp.h>
+
+#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#include <net/if_dl.h>
+#endif
+
+#include <netinet/if_ether.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+
 #include "capture.h"
 #include "sens.h"
 #include "log.h"
@@ -26,23 +42,34 @@
 
 int seq = 0;
 int abus = 50;
-int base = 22;
+int base = 21;
 int count = 0;
 int count_t = 0;
 data_mac me;
+pcap_t *idcap;
 
 void callback(u_char *, const struct pcap_pkthdr *, const u_char *);
 
-void cap_snif(void){
+void cap_init(void){
 	char err[PCAP_ERRBUF_SIZE];
 	char *device;
 	char ethernet[18];
 	char filtre[1024];
-	pcap_t *idcap;
 	struct bpf_program bp;
 	int promisc;
+
+	#if defined(__linux__)
 	int sock_fd;
 	struct ifreq ifr;
+	#endif
+
+	#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+	int mib[6], len;
+	char *buf;
+	unsigned char *ptr;
+	struct if_msghdr *ifm;
+	struct sockaddr_dl *sdl;
+	#endif
 
 	/* recherche le premier device deisponoible */
 	device = NULL;
@@ -65,27 +92,60 @@ void cap_snif(void){
 
 	/* fiond my arp adresses */
 	strncpy(filtre, FILTER, 1024);
-	
+
 	if(config[CF_IGNORE_ME].valeur.integer == TRUE){
+		#if defined(__linux__)
 		if((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1 ){
 			logmsg(LOG_ERR, "[%s %i] Error in socket creation", __FILE__, __LINE__);
 			exit(1);
 		}
-		
 		memset(&ifr, 0, sizeof(ifr));
 		strncpy (ifr.ifr_name, device, sizeof(ifr.ifr_name));
-
 		if (ioctl(sock_fd, SIOCGIFHWADDR, &ifr) == -1 ) {
 			logmsg(LOG_ERR, "[%s %i] Error in ioctl call", __FILE__, __LINE__);
 			exit(1);
 		}
-
 		me.octet[0] = ifr.ifr_addr.sa_data[0];
 		me.octet[1] = ifr.ifr_addr.sa_data[1];
 		me.octet[2] = ifr.ifr_addr.sa_data[2];
 		me.octet[3] = ifr.ifr_addr.sa_data[3];
 		me.octet[4] = ifr.ifr_addr.sa_data[4];
 		me.octet[5] = ifr.ifr_addr.sa_data[5];
+		#endif
+
+		#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+		mib[0] = CTL_NET;
+		mib[1] = AF_ROUTE;
+		mib[2] = 0;
+		mib[3] = AF_LINK;
+		mib[4] = NET_RT_IFLIST;
+		if ((mib[5] = if_nametoindex(device)) == 0) {
+			logmsg(LOG_ERR, "[%s %i] if_nametoindex error", __FILE__, __LINE__);
+			exit(1);
+		}
+		if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0) {
+			logmsg(LOG_ERR, "[%s %i] sysctl 1 error", __FILE__, __LINE__);
+			exit(1);
+		}
+		if ((buf = malloc(len)) == NULL) {
+			logmsg(LOG_ERR, "[%s %i] malloc error", __FILE__, __LINE__);
+			exit(1);
+		}
+		if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
+			logmsg(LOG_ERR, "[%s %i] sysctl 2 error", __FILE__, __LINE__);
+			exit(1);
+		}
+		ifm = (struct if_msghdr *)buf;
+		sdl = (struct sockaddr_dl *)(ifm + 1);
+		ptr = (unsigned char *)LLADDR(sdl);
+		me.octet[0] = *ptr;
+		me.octet[1] = *(ptr+1);
+		me.octet[2] = *(ptr+2);
+		me.octet[3] = *(ptr+3);
+		me.octet[4] = *(ptr+4);
+		me.octet[5] = *(ptr+5);
+		free(buf);
+		#endif
 
 		data_tomac(me, (unsigned char *)ethernet);
 		strncat(filtre, " not ether host ", 1024);
@@ -103,20 +163,9 @@ void cap_snif(void){
 		exit(1);
 	}
 
-	logmsg(LOG_DEBUG, "[%s %i] pcap link type:  %s", __FILE__, __LINE__,
-		pcap_datalink_val_to_name(pcap_datalink(idcap)));
-	switch(pcap_datalink(idcap)){
-		case DLT_EN10MB:
-			base = 21;
-			break;
-
-		case DLT_LINUX_SLL:
-			base = 23;
-			break;
-
-		default:
-			logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: unrecognied link", __FILE__, __LINE__);
-			exit(1);
+	if(pcap_datalink(idcap) != DLT_EN10MB){
+		logmsg(LOG_ERR, "[%s %i] pcap_datalink errror: unrecognied link", __FILE__, __LINE__);
+		exit(1);
 	}
 	
 	/* initilise le filtre: */
@@ -134,14 +183,16 @@ void cap_snif(void){
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] pcap_setfilter [%s]: ok", __FILE__, __LINE__, FILTER);
 	#endif
+}
 
-	while (TRUE) {
-		
+void cap_sniff(void){
+	while(TRUE){
 		if(pcap_loop(idcap, 0, callback, NULL)<0){
 			logmsg(LOG_ERR, "[%s %i] pcap_loop error: %s (trying to reconnect)", 
 				__FILE__, __LINE__, pcap_geterr(idcap));
 		}
 	}
+	exit(1);
 }
 
 void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
@@ -275,6 +326,12 @@ void callback(u_char *user, const struct pcap_pkthdr *h, const u_char *buff){
 					if(data[0].flag != ALLOW){
 						flag=FALSE;
 					}
+				}
+			}
+	
+			if(data != NULL && config[CF_IGNORESELFTEST].valeur.integer == TRUE){
+				if(data->ip.ip == ip_33.ip){
+					flag = FALSE;
 				}
 			}
 			

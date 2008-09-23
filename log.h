@@ -7,4 +7,5 @@
 #define LOG_INFO        6
 #define LOG_DEBUG       7
 
+void initlog(void);
 void logmsg(int, const char *, ...);

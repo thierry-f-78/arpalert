@@ -1201,6 +1201,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 ac_config_files="$ac_config_files Makefile"
 
+ac_config_files="$ac_config_files doc/arpalert.8"
+
 ac_config_headers="$ac_config_headers config.h"
 
 
@@ -3961,7 +3963,6 @@ fi
 
 DEFS=-DHAVE_CONFIG_H
 
-
 : ${CONFIG_STATUS=./config.status}
 ac_clean_files_save=$ac_clean_files
 ac_clean_files="$ac_clean_files $CONFIG_STATUS"
@@ -4425,6 +4426,8 @@ s,@datadir@,$datadir,;t t
 s,@sysconfdir@,$sysconfdir,;t t
 s,@sharedstatedir@,$sharedstatedir,;t t
 s,@localstatedir@,$localstatedir,;t t
+s,@in_localstatedir@,$( eval "echo $localstatedir"),;t t
+s,@in_sysconfdir@,$(eval "echo $sysconfdir"),;t t
 s,@libdir@,$libdir,;t t
 s,@includedir@,$includedir,;t t
 s,@oldincludedir@,$oldincludedir,;t t

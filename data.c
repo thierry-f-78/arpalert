@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <time.h>
 #include "data.h"
@@ -163,7 +162,7 @@ void data_dump(void){
 		if(fp == NULL){
 			logmsg(LOG_ERR, "[%s %i] Can't open file [%s]", __FILE__, __LINE__, 
 				config[CF_LEASES].valeur.string);
-			return;
+			exit(1);
 		}
 	} else {
 		return;

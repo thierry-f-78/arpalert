@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <errno.h>
+
 #include "alerte.h"
 #include "log.h"
 #include "loadconfig.h"
@@ -42,13 +42,12 @@ void addpid(int pid){
 	/* reallocation de la memoire */
 	if(num_pids!=0){
 		test = (c_pid *)realloc(pids, num_pids * sizeof(c_pid));
+		if(test == NULL){
+			logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct", __FILE__, __LINE__);
+			exit(1);
+		}
+		pids = test;
 	}
-	if(test == NULL){
-		logmsg(LOG_ERR, "[%s %i] Can't allocate memory for c_pid struct", __FILE__, __LINE__);
-		free(pids);
-		exit(1);
-	}
-	pids = test;
 
 	/* ajout des valeurs */
 	pids[num_pids-1].pid = pid;
@@ -209,7 +208,7 @@ int alerte(unsigned char *mac, unsigned char *ip, unsigned char *rq, int alert_l
 	
 	snprintf(alert, 5, "%i", alert_level);
 	ret = execlp(config[CF_ACTION].valeur.string, config[CF_ACTION].valeur.string,
-		mac, ip, rq, alert, NULL);
+		mac, ip, rq, alert, (char*)0);
 	if(ret < 0){
 		logmsg(LOG_ERR, "[%s %i] Error at execution of \"%s\", error %i: %s", __FILE__, __LINE__,
 			config[CF_ACTION].valeur.string, errno, errmsg[errno]);

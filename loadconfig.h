@@ -37,26 +37,31 @@
 #define CF_LOGDENY  		20
 #define CF_ALRDENY  		21
 #define CF_LOGNEW  		22
-#define CF_ALRNEW		23
-#define CF_ALRIP		24
-#define CF_LOGIP		25
-#define CF_AUTHFILE		26
-#define CF_LOG_UNAUTH_RQ	27
-#define CF_ALERT_UNAUTH_RQ	28
-#define CF_LOG_ABUS		29
-#define CF_ALERT_ABUS		30
-#define CF_LOG_BOGON		31
-#define CF_ALR_BOGON		32
-#define CF_IGNORE_UNKNOW	33
-#define CF_DUMP_PAQUET		34
-#define CF_PROMISC		35
-#define CF_ANTIFLOOD_INTER	36
-#define CF_ANTIFLOOD_GLOBAL	37
-#define CF_LOG_FLOOD		38
-#define CF_ALERT_ON_FLOOD	39
-#define CF_IGNORE_ME		40
+#define CF_ALRNEW           23
+#define CF_ALRIP            24
+#define CF_LOGIP            25
+#define CF_AUTHFILE         26
+#define CF_LOG_UNAUTH_RQ    27
+#define CF_ALERT_UNAUTH_RQ  28
+#define CF_LOG_ABUS         29
+#define CF_ALERT_ABUS       30
+#define CF_LOG_BOGON        31
+#define CF_ALR_BOGON        32
+#define CF_IGNORE_UNKNOW    33
+#define CF_DUMP_PAQUET      34
+#define CF_PROMISC          35
+#define CF_ANTIFLOOD_INTER  36
+#define CF_ANTIFLOOD_GLOBAL 37
+#define CF_LOG_FLOOD        38
+#define CF_ALERT_ON_FLOOD   39
+#define CF_IGNORE_ME        40
+#define CF_UMASK            41
+#define CF_USER             42
+#define CF_CHROOT           43
+#define CF_USESYSLOG        44
+#define CF_IGNORESELFTEST   45
 
-#define NUM_PARAMS  		41
+#define NUM_PARAMS          46
 
 int flagdump;
 
@@ -76,4 +81,4 @@ char config_file[2048];
 char **margv;
 int margc;
 
-void config_load(void);
+void config_load(int, char **);

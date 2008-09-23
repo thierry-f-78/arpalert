@@ -11,87 +11,101 @@ libdir = @libdir@
 infodir = @infodir@
 mandir = @mandir@
 includedir = @includedir@
-CC = @CC@
-FLAGS = -Wall -pedantic
-
 config_dir = @sysconfdir@/arpalert
 leases_dir = @localstatedir@/lib/arpalert
 lock_dir = @localstatedir@/run
+log_dir = @localstatedir@/log
+src_dir = .
 
+CC = @CC@
+CFLAGS = -Wall -O2 -DCONFIG_FILE=\"$(config_dir)/arpalert.conf\" -DPID_FILE=\"$(lock_dir)/arpalert.pid\"
 LIBS = @LIBS@
 OBJECT_LIST = \
-	obj/arpalert.o \
-	obj/loadconfig.o \
-	obj/log.o \
-	obj/data.o \
-	obj/maclist.o \
-	obj/serveur.o \
-	obj/alerte.o \
-	obj/sens.o \
-	obj/capture.o
+	$(src_dir)/arpalert.o \
+	$(src_dir)/loadconfig.o \
+	$(src_dir)/log.o \
+	$(src_dir)/data.o \
+	$(src_dir)/maclist.o \
+	$(src_dir)/serveur.o \
+	$(src_dir)/alerte.o \
+	$(src_dir)/sens.o \
+	$(src_dir)/capture.o
 
-#DEFS = -DCONFIG_FILE=\"@sysconfdir@/arpalert/arpalert.conf\"
-DEFS = -DCONFIG_FILE=\"${config_dir}/arpalert.conf\" -DPID_FILE=\"${lock_dir}/arpalert.pid\"
+arpalert: $(OBJECT_LIST)
+	$(CC) $(CFLAGS) -g -O2 -o arpalert $(OBJECT_LIST) $(LIBS)
 
-arpalert: ${OBJECT_LIST}
-	${CC} ${FLAGS} -g -O2 -o obj/arpalert ${OBJECT_LIST} ${FLAGS} ${LIBS} ${DEFS}
+log.o: log.c log.h config.h
+	$(CC) $(CFLAGS) -c -o log.o $(src_dir)/log.c $(DEFS)
 
-obj/log.o: log.c log.h config.h
-	${CC} ${FLAGS} -c -o obj/log.o log.c ${DEFS}
+loadconfig.o: loadconfig.c loadconfig.h config.h
+	$(CC) $(CFLAGS) -c -o loadconfig.o $(src_dir)/loadconfig.c
 
-obj/loadconfig.o: loadconfig.c loadconfig.h config.h
-	${CC} ${FLAGS} -c -o obj/loadconfig.o loadconfig.c ${DEFS}
+arpalert.o: arpalert.c config.h
+	$(CC) $(CFLAGS) -c -o arpalert.o $(src_dir)/arpalert.c
 
-obj/arpalert.o: arpalert.c config.h
-	${CC} ${FLAGS} -c -o obj/arpalert.o arpalert.c ${DEFS}
+data.o: data.c data.h config.h
+	$(CC) $(CFLAGS) -c -o data.o $(src_dir)/data.c
 
-obj/data.o: data.c data.h config.h
-	${CC} ${FLAGS} -c -o obj/data.o data.c ${DEFS}
+maclist.o: maclist.c maclist.h config.h
+	$(CC) $(CFLAGS) -c -o maclist.o $(src_dir)/maclist.c
 
-obj/maclist.o: maclist.c maclist.h config.h
-	${CC} ${FLAGS} -c -o obj/maclist.o maclist.c ${DEFS}
+serveur.o: serveur.c serveur.h config.h
+	$(CC) $(CFLAGS) -c -o serveur.o $(src_dir)/serveur.c
 
-obj/serveur.o: serveur.c serveur.h config.h
-	${CC} ${FLAGS} -c -o obj/serveur.o serveur.c ${DEFS}
+capture.o: capture.c capture.h config.h
+	$(CC) $(CFLAGS) -c -o capture.o $(src_dir)/capture.c
 
-obj/capture.o: capture.c capture.h config.h
-	${CC} ${FLAGS} -c -o obj/capture.o capture.c ${DEFS}
+sens.o: sens.c sens.h sens.h config.h
+	$(CC) $(CFLAGS) -c -o sens.o $(src_dir)/sens.c
 
-obj/sens.o: sens.c sens.h sens.h config.h
-	${CC} ${FLAGS} -c -o obj/sens.o sens.c ${DEFS}
-
-obj/alerte.o: alerte.c alerte.h config.h
-	${CC} ${FLAGS} -c -o obj/alerte.o alerte.c ${DEFS}
+alerte.o: alerte.c alerte.h config.h
+	$(CC) $(CFLAGS) -c -o alerte.o $(src_dir)/alerte.c
 
 clean:
 	rm -f *~ *.o
-	rm -f obj/*
+	rm -f arpalert
 	rm -f config.log
 	rm -f config.status
 
 install:
-	mkdir -p ${sbindir}
-	mkdir -p ${leases_dir}
-	mkdir -p ${lock_dir}
-	mkdir -p ${config_dir}	
-	cp obj/arpalert ${sbindir}
-	test ! -f ${config_dir}/maclist.allow && > ${config_dir}/maclist.allow || /bin/true
-	test ! -f ${config_dir}/maclist.deny  && > ${config_dir}/maclist.deny  || /bin/true
-	if test ! -f ${config_dir}/arpalert.conf; \
+	mkdir -p $(sbindir)
+	mkdir -p $(leases_dir)
+	mkdir -p $(lock_dir)
+	mkdir -p $(log_dir)
+	mkdir -p $(config_dir)	
+	mkdir -p $(mandir)/man8
+	cp -f doc/arpalert.8 $(mandir)/man8
+	cp -f arpalert $(sbindir)
+	test ! -f $(config_dir)/maclist.allow && > $(config_dir)/maclist.allow || /bin/true
+	test ! -f $(config_dir)/maclist.deny  && > $(config_dir)/maclist.deny  || /bin/true
+	if test ! -f $(config_dir)/arpalert.conf; \
 	then \
-	  > ${config_dir}/arpalert.conf; \
-	  echo "# white list" >> ${config_dir}/arpalert.conf; \
-	  echo "Maclist file = ${config_dir}/maclist.allow" >> ${config_dir}/arpalert.conf; \
-	  echo "# black list" >> ${config_dir}/arpalert.conf; \
-	  echo "Maclist alert file = ${config_dir}/maclist.deny" >> ${config_dir}/arpalert.conf; \
-	  echo "# dump file" >> ${config_dir}/arpalert.conf; \
-	  echo "Maclist leases file = ${leases_dir}/arpalert.leases" >> ${config_dir}/arpalert.conf; \
-	  echo "# list of authorized request" >> ${config_dir}/arpalert.conf; \
-	  echo "auth request file = ${config_dir}/authrq.conf" >> ${config_dir}/arpalert.conf; \
-	  echo >> ${config_dir}/arpalert.conf; \
-	  echo "# pid file" >> ${config_dir}/arpalert.conf; \
-	  echo "Lock file = ${lock_dir}/arpalert.lock" >> ${config_dir}/arpalert.conf; \
-	  cat etc/arpalert.conf.in  >> ${config_dir}/arpalert.conf; \
+	  > $(config_dir)/arpalert.conf; \
+	  echo "# white list" >> $(config_dir)/arpalert.conf; \
+	  echo "Maclist file = $(config_dir)/maclist.allow" >> $(config_dir)/arpalert.conf; \
+	  echo >> $(config_dir)/arpalert.conf; \
+	  \
+	  echo "# black list" >> $(config_dir)/arpalert.conf; \
+	  echo "Maclist alert file = $(config_dir)/maclist.deny" >> $(config_dir)/arpalert.conf; \
+	  echo >> $(config_dir)/arpalert.conf; \
+	  \
+	  echo "# dump file" >> $(config_dir)/arpalert.conf; \
+	  echo "Maclist leases file = $(leases_dir)/arpalert.leases" >> $(config_dir)/arpalert.conf; \
+	  echo >> $(config_dir)/arpalert.conf; \
+	  \
+	  echo "# list of authorized request" >> $(config_dir)/arpalert.conf; \
+	  echo "#Auth request file = $(config_dir)/authrq.conf" >> $(config_dir)/arpalert.conf; \
+	  echo >> $(config_dir)/arpalert.conf; \
+	  \
+	  echo "# log file" >> $(config_dir)/arpalert.conf; \
+	  echo "#log file = $(log_dir)/arpalert.log" >> $(config_dir)/arpalert.conf; \
+	  echo >> $(config_dir)/arpalert.conf; \
+	  \
+	  echo "# pid file" >> $(config_dir)/arpalert.conf; \
+	  echo "Lock file = $(lock_dir)/arpalert.lock" >> $(config_dir)/arpalert.conf; \
+	  echo >> $(config_dir)/arpalert.conf; \
+	  \
+	  cat etc/arpalert.conf.in  >> $(config_dir)/arpalert.conf; \
 	else \
 	  /bin/true; \
 	fi

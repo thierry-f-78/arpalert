@@ -1,10 +1,13 @@
 #include <fcntl.h>
 #include <signal.h>
+#include <grp.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+
 #include "loadconfig.h"
 #include "log.h"
 #include "data.h"
@@ -35,11 +38,20 @@ int main(int argc, char **argv){
 	flagdump = TRUE;
 	
 	/* va lire le fichier de configuration */
-	config_load();
+	config_load(argc, argv);
+	
+	/* log system initialization */
+	initlog();
+	
+	/* initilaize pcap */
+	cap_init();
 
 	/* si il le faut, passer le binaire en daemon */
 	if(config[CF_DAEMON].valeur.integer == TRUE) daemonize();
 
+	/* separation des priviliges et chrooting */
+	separe();
+	
 	/* mise en place des signaux */
 	(void)setsignal(SIGINT,  die);
 	(void)setsignal(SIGTERM, die);
@@ -47,11 +59,6 @@ int main(int argc, char **argv){
 	(void)setsignal(SIGABRT, die);
 	(void)setsignal(SIGHUP,  loadconfig); 
 	(void)setsignal(SIGALRM, dumpmaclist);
-	/*
-	if(config[CF_ACTION].valeur.string[0]!=0){
-		(void)setsignal(SIGCHLD, killchild);
-	}
-	*/
 
 	/* initialisation de la structure mac */
 	data_init();
@@ -72,8 +79,8 @@ int main(int argc, char **argv){
 	alarm(CHECKPOINT);
 
 	/* boucle principale */
-	cap_snif();
-	
+	cap_sniff();
+
 	exit(1);
 }
 
@@ -92,6 +99,10 @@ void loadconfig(int signal){
 }
 
 void dumpmaclist(int signal){
+	#ifdef DEBUG 
+	logmsg(LOG_DEBUG, "[%s %i] entering dumpmaclist. 1s ...", __FILE__, __LINE__);
+	#endif
+
 	/* dump toutes les 5s si demande active */
 	if((time(NULL) - dumptime) > 5){
 		if(flagdump == TRUE){

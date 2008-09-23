@@ -14,7 +14,7 @@ typedef struct {
 /* defini une adresse ip */
 typedef union {
 	unsigned char bytes[4];
-	int ip;
+	u_int32_t ip;
 } data_ip;
 
 typedef struct {

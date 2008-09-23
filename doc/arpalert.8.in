@@ -48,6 +48,39 @@ Debug option: print a dump of paquets captured.
 The config file contain 3 types of data: integer, string and boolean. The boolean type can take values 'oui', 'true', 'yes', '1'
 for the true values or 'non', 'no', 'false', '0' for the falses values.
 .TP
+\fBuser\fR = arpalert
+Use privileges separation whith this user
+.TP
+\fBumask\fR = 177
+Uses this mask for the files created
+.TP
+\fBchroot dir\fR = @prefix@
+Use this directory for program jail
+.br
+If this option is commented the program does not chroot
+.br
+The program read the config file and open the syslog socket before the chroot:
+.br
+The kill -HUP does not run with chroot.
+.br
+If the syslog program is restarted, the socket change and the arpalert syslog system can't be connect to the new socket:
+the logs with syslog are disabled. Prefere to use the log file.
+.br
+All the path file are relative to the chroot dir (but not the config file)
+.TP
+\fBlog file\fR = @in_localstatedir@/log/arpalert.log
+The program log into this file
+.br
+If this option is commented, the internal system log is not used
+.br
+The internal system logs can be used in same time that syslog.
+.TP
+\fBlog level\fR = 6
+The level logged. the level are bitween 0 (emergency) and 7 (debug). if 3 is selected all levels between 0 and 3 are logged.
+.TP
+\fBuse syslog\fR = true
+If this option is false, the syslog system is disabled
+.TP
 \fBMaclist file\fR = @in_sysconfdir@/arpalert/maclist.allow
 white list
 .TP
@@ -62,9 +95,6 @@ list of authorized request"
 .TP
 \fBLock file\fR = @in_localstatedir@/run/arpalert.lock
 pid file
-.TP
-\fBlog level\fR = 6
-The level logged. the level are bitween 0 (emergency) and 7 (debug). if 3 is selected all levels bitween 0 and 3 arre logged.
 .TP
 \fBdump paquet\fR = false
 Only for debugging: this dump paquet received on standard output
