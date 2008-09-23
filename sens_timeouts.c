@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens_timeouts.c 87 2006-05-09 07:58:27Z thierry $
+ * $Id: sens_timeouts.c 124 2006-05-10 21:46:12Z thierry $
  *
  */
 
@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <sys/types.h>
 
 #include "arpalert.h"
 #include "data.h"

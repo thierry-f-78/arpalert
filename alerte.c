@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: alerte.c 87 2006-05-09 07:58:27Z thierry $
+ * $Id: alerte.c 124 2006-05-10 21:46:12Z thierry $
  *
  */
 
@@ -115,7 +115,7 @@ void addpid(int pid){
 
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG, "[%s %i] Add pid %i at time %d", __FILE__, __LINE__,
-	       last_pid->pid, (unsigned int)last_pid->time);
+	       assign->pid, (unsigned int)assign->time);
 	#endif
 
 	atomic_add = FALSE;

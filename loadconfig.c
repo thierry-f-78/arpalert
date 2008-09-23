@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 86 2006-05-09 07:43:38Z thierry $
+ * $Id: loadconfig.c 124 2006-05-10 21:46:12Z thierry $
  *
  */
 
@@ -32,12 +32,13 @@ void usage(){
 	printf(
 	"\n"
 	"arpalert [-f config_file] [-i network_interface] [-p pid_file] [-e exec_script]\n"
-	"    [-D log_level] [-l leases_file] [-d][-v][-h][-w]\n"
+	"    [-D log_level] [-l leases_file] [-d][-v][-h][-w][-v][-P]\n"
 	"\n"
 	"    -d run as daemon\n"
 	"    -v dump config\n"
 	"    -h this help\n"
 	"    -w debug option: print a dump of paquets captured\n"
+	"    -P run in promiscuous mode\n"
 	"\n");
 	exit(1);
 }

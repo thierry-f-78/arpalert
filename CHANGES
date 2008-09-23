@@ -1,3 +1,11 @@
+1.0.2   * info<at>arpalert<dot>org
+          complete inline help
+          minor security fix: changes from sprintf to snprintf in data.c
+          minor bugfix in compilation in debug code
+          add header at file arpalert.h
+          add header at sens_timeouts.c (for mac OS X)
+          add copyright informations at file arpalert.h
+
 1.0.1   * info<at>arpalert<dot>org:
           error in log format for "unknow_address" alert
           error in pid structur initialization

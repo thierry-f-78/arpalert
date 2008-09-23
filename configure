@@ -1308,6 +1308,12 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
           ac_config_files="$ac_config_files Makefile"
 
+          ac_config_files="$ac_config_files scripts/start/arpalert-debian"
+
+          ac_config_files="$ac_config_files scripts/start/arpalert-fc4"
+
+          ac_config_files="$ac_config_files scripts/start/arpalert-suse"
+
           ac_config_headers="$ac_config_headers config.h"
 
 
@@ -4368,18 +4374,24 @@ else
   ac_cv_func_fork_works=cross
 else
   cat >conftest.$ac_ext <<_ACEOF
-/* By Ruediger Kuhlmann. */
-      #include <sys/types.h>
-      #if HAVE_UNISTD_H
-      # include <unistd.h>
-      #endif
-      /* Some systems only have a dummy stub for fork() */
-      int main ()
-      {
-	if (fork() < 0)
-	  exit (1);
-	exit (0);
-      }
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+int
+main ()
+{
+
+	  /* By Ruediger Kuhlmann. */
+	  if (fork() < 0)
+	    exit (1);
+	  exit (0);
+
+  ;
+  return 0;
+}
 _ACEOF
 rm -f conftest$ac_exeext
 if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
@@ -5558,6 +5570,9 @@ do
   case "$ac_config_target" in
   # Handling of arguments.
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+  "scripts/start/arpalert-debian" ) CONFIG_FILES="$CONFIG_FILES scripts/start/arpalert-debian" ;;
+  "scripts/start/arpalert-fc4" ) CONFIG_FILES="$CONFIG_FILES scripts/start/arpalert-fc4" ;;
+  "scripts/start/arpalert-suse" ) CONFIG_FILES="$CONFIG_FILES scripts/start/arpalert-suse" ;;
   "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}

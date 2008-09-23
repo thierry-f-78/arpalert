@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: data.c 89 2006-05-09 15:31:10Z thierry $
+ * $Id: data.c 124 2006-05-10 21:46:12Z thierry $
  *
  */
 
@@ -247,7 +247,7 @@ void data_dump(void){
 			// dump
 			if( ( dump_mask & dump->data.flag) != 0 ){
 				if(dump->data.ip.ip != 0){
-					len = sprintf(msg, "%02x:%02x:%02x:%02x:%02x:%02x %i.%i.%i.%i\n",
+					len = snprintf(msg, 35, "%02x:%02x:%02x:%02x:%02x:%02x %i.%i.%i.%i\n",
 					              dump->data.mac.octet[0], dump->data.mac.octet[1],
 					              dump->data.mac.octet[2], dump->data.mac.octet[3],
 					              dump->data.mac.octet[4], dump->data.mac.octet[5], 
