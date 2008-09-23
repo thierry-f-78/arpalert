@@ -1,3 +1,7 @@
+2.0.4   * info<at>arpalert<dot>org 
+          segfault when config is dumped
+          compilation error on ppc processors (sign error)
+
 2.0.3   * Jan Wagner waja<at>cyconet<dot>org
 BETA      man corrections
         * info<at>arpalert<dot>org 

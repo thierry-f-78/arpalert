@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: loadconfig.c 450 2006-11-24 10:33:55Z thierry $
+ * $Id: loadconfig.c 471 2007-02-05 02:38:09Z thierry $
  *
  */
 
@@ -351,8 +351,8 @@ void config_load(int argc, char *argv[]){
 		}
 	}
 
-	/* load command line parameters 
-	 * (this supplant config file params) */
+	// load command line parameters
+	// (this supplant config file params)
 	for(i=1; i<argc; i++){
 		if(argv[i][0]=='-'){
 			switch(argv[i][1]){
@@ -461,7 +461,7 @@ void config_load(int argc, char *argv[]){
 		for(i=0; i<NUM_PARAMS; i++){
 			switch(config[i].type){
 				case 0:
-					logmsg(LOG_NOTICE, "%s = \"%s\"",*
+					logmsg(LOG_NOTICE, "%s = \"%s\"",
 					       config[i].attrib, config[i].valeur.string);
 				break;
 

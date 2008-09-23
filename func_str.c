@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: func_str.c 450 2006-11-24 10:33:55Z  $
+ * $Id: func_str.c 471 2007-02-05 02:38:09Z  $
  *
  */
 

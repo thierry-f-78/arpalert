@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2010 Thierry FOURNIER
- * $Id: sens.c 450 2006-11-24 10:33:55Z thierry $
+ * $Id: sens.c 471 2007-02-05 02:38:09Z thierry $
  *
  */
 
@@ -129,7 +129,7 @@ int sens_init(int status) {
 	char *parse;
 	int i, j;
 	char sort_tmp;
-	char list_mask[33];
+	signed char list_mask[33];
 	char *str_ip;
 	char *str_mask;
 	struct in_addr ip;
@@ -236,7 +236,7 @@ int sens_init(int status) {
 				       ligne, args[1]);
 				exit(1);
 			}
-			
+
 			// set mac address
 			if(str_to_mac(args[0], &mac) == -1){
 				logmsg(LOG_ERR,
@@ -246,7 +246,7 @@ int sens_init(int status) {
 				return -1;
 			}
 		}
-		
+
 		// add address
 		i = MAX_CONTEXT_ARGS;
 		while(i < arg_n){
@@ -276,8 +276,6 @@ int sens_init(int status) {
 			// network address validation
 			mask = atoi(str_mask);
 			binmask.s_addr = dec_to_bin[mask];
-
-			// check network validation
 			if( (ip.s_addr & binmask.s_addr) != ip.s_addr){
 				logmsg(LOG_ERR,
 				       "file: \"%s\", line %d: incorrect value %s/%u",
