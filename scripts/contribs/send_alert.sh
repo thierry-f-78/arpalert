@@ -14,8 +14,21 @@ intruder_MAC=$1
 # Intruder IP address
 intruder_IP=$2
 
+# Extra parameter
+intruder_Extra=$3
+
+# Interface
+intruder_Interface=$4
+
 # Alert Type
-intruder_AlertType=$4
+intruder_AlertType=$5
+
+# Vendor
+if test ! -z "$6"; then
+	intruder_Vendor="$6"
+else
+	intruder_Vendor="unknown mac vendor"
+fi
 
 # Mail recipient
 mail_To="Jean Dupont <jdupond@domain.com>"
@@ -30,7 +43,9 @@ cat << EOF | mail -s "$mail_Subject" $mail_To
 Intrusion time stamp : $(date)
 
 Intruder Ip Address : $intruder_IP
-Intruder MAC Address : $intruder_MAC
+Intruder MAC Address : $intruder_MAC ($intruder_Vendor)
+Intruder Extra info : $intruder_Extra
+Intruder Interface : $intruder_Interface
 Type of alert : $intruder_AlertType
 EOF
 
