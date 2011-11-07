@@ -56,6 +56,8 @@ void usage(){
 	exit(1);
 }
 
+struct config_cell config[NUM_PARAMS];
+
 void config_load(int argc, char *argv[]){
 	FILE *fp;
 	char buffer[4096];

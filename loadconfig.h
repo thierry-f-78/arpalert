@@ -115,16 +115,17 @@ int flagdump;
  * value:
  *  valeur du parametre de type indefini
  */
-typedef struct {
+struct config_cell {
 	int		type;
 	char		*attrib;
 	union {
 		char	*string;
 		int	integer;
 	} valeur;
-} config_cell;
+};
 
-config_cell config[NUM_PARAMS];
+extern struct config_cell config[];
+
 char config_file[CONFIGFILE_LEN];
 
 // load config file values
