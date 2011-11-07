@@ -172,6 +172,27 @@ void data_reset(void){
 	}
 }
 
+// clear all status
+void data_reset_status(void){
+	struct data_pack *cls;
+	struct data_pack *clsnext;
+	struct data_pack *base;
+	int step;
+
+	step = 0;
+	while(step < HASH_SIZE){
+		base = &data_mac_tab[step];
+		base->flag = APPEND;
+		clsnext = base->next_mac;
+		while(clsnext != base){
+			cls = clsnext;
+			clsnext = clsnext->next_mac;
+			cls->flag = APPEND;
+		}
+		step++;
+	}
+}
+
 // update mac address in hash
 void data_update_field(struct ether_addr *mac, int status,
                     struct in_addr ip,

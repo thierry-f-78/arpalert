@@ -98,6 +98,9 @@ void data_init(void);
 // clear all datas
 void data_reset(void);
 
+// clear all status
+void data_reset_status(void);
+
 // call a dump of all datas
 void data_rqdump(void);
 

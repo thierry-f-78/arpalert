@@ -305,6 +305,9 @@ void maclist_reload(void){
 		}
 	}
 
+	// clear old status
+	data_reset_status();
+
 	// test black list
 	if(config[CF_BLACKLST].valeur.string != NULL &&
 	   config[CF_BLACKLST].valeur.string[0] != 0){
