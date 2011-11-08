@@ -7,6 +7,17 @@
 #ifndef __CAPTURE_H__
 #define __CAPTURE_H__
 
+#define FLAG_IPCHG      0x00000001 // 0
+#define FLAG_ALLOW      0x00000002 // 1
+#define FLAG_DENY       0x00000004 // 2
+#define FLAG_NEW        0x00000008 // 3
+#define FLAG_UNAUTH_RQ  0x00000010 // 4
+#define FLAG_ABUS       0x00000020 // 5
+#define FLAG_BOGON      0x00000040 // 6
+#define FLAG_FLOOD      0x00000080 // 7
+#define FLAG_NEWMAC     0x00000100 // 8
+#define FLAG_MACCHG     0x00000200 // 9
+
 // init capture system
 void cap_init(void);
 

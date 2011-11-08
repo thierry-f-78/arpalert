@@ -28,6 +28,8 @@
 #   define U_INT8_T u_int8_t
 #endif
 
+#include "capture.h"
+
 #define NOT_EXIST            0x00
 #define ALLOW                0X01
 #define DENY                 0x02
@@ -74,23 +76,23 @@ struct data_pack {
 };
 
 // set ip_change              0: 1st bit
-#define SET_IP_CHANGE(a)      a |= 0x00000001
-#define ISSET_IP_CHANGE(a)    (a & 0x00000001)
+#define SET_IP_CHANGE(a)      a |= FLAG_IPCHG
+#define ISSET_IP_CHANGE(a)    (a & FLAG_IPCHG)
 // set black_listed           2: 3rd bit
-#define SET_BLACK_LISTED(a)   a |= 0x00000004
-#define ISSET_BLACK_LISTED(a) (a & 0x00000004)
+#define SET_BLACK_LISTED(a)   a |= FLAG_DENY
+#define ISSET_BLACK_LISTED(a) (a & FLAG_DENY)
 // set unauthorized_request   4: 5th bit
-#define SET_UNAUTH_RQ(a)      a |= 0x00000010
-#define ISSET_UNAUTH_RQ(a)    (a & 0x00000010)
+#define SET_UNAUTH_RQ(a)      a |= FLAG_UNAUTH_RQ
+#define ISSET_UNAUTH_RQ(a)    (a & FLAG_UNAUTH_RQ)
 // set rq_abus                5: 6th bit
-#define SET_RQ_ABUS(a)        a |= 0x00000020
-#define ISSET_RQ_ABUS(a)      (a & 0x00000020)
+#define SET_RQ_ABUS(a)        a |= FLAG_ABUS
+#define ISSET_RQ_ABUS(a)      (a & FLAG_ABUS)
 // set mac_error              6: 7th bit
-#define SET_MAC_ERROR(a)      a |= 0x00000040
-#define ISSET_MAC_ERROR(a)    (a & 0x00000040)
+#define SET_MAC_ERROR(a)      a |= FLAG_BOGON
+#define ISSET_MAC_ERROR(a)    (a & FLAG_BOGON)
 // set mac_change             9: 10th bit
-#define SET_MAC_CHANGE(a)     a |= 0x00000200
-#define ISSET_MAC_CHANGE(a)   (a & 0x00000200)
+#define SET_MAC_CHANGE(a)     a |= FLAG_MACCHG
+#define ISSET_MAC_CHANGE(a)   (a & FLAG_MACCHG)
 
 // initialize data system
 void data_init(void);
