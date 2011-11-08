@@ -38,7 +38,7 @@ syn match   arpKey       /expire authorized mac addresses/
 syn match   arpKey       /\(maclist\( alert\| leases\)\?\|log\|lock\|auth request\|mac vendor\) file/
 syn match   arpKey       /use syslog\|log level\|catch only arp\|mod config\|execution timeout\|promiscuous\|reload interval/
 syn match   arpKey       /max request\|anti flood \(interval\|global\)\|max entry\|mac timeout\|max alert\|\(action\|mod\) on detect/
-syn match   arpKey       /dump \(black list\|white list\|new address\|inter\|paquet\)/
+syn match   arpKey       /dump \(black list\|white list\|new address\|inter\|packet\)/
 syn match   arpKey       /ignore \(unknown sender\|me\|self test\)\|unauth ignore time method/
 syn keyword arpKey       user umask daemon interface
 syn case    ignore
