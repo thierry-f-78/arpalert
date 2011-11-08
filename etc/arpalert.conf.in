@@ -94,6 +94,9 @@ dump new address = true
 # after this time a mac adress is removed from memory (seconds) (default 1 month)
 mac timeout = 259200
 
+# Allow arpalert to expire authorized mac addresses
+expire authorized mac addresses = false
+
 # after this limit the memory hash is cleaned (protect to arp flood)
 max entry = 1000000
 

@@ -505,7 +505,14 @@ void data_clean(void){
 			// get next
 			clean_next = clean->next_chain;
 	
-			if(clean->flag == APPEND){
+			if(
+			   clean->flag == APPEND ||
+			   (
+			      clean->flag == ALLOW &&
+			      config[CF_EXPIRE_AUTH].valeur.integer == TRUE &&
+			      ISSET_MAC_EXPIRE(clean->alerts) == FALSE
+			   )
+			){
 				// unindex ip hash
 				clean->prev_ip->next_ip = clean->next_ip;
 				clean->next_ip->prev_ip = clean->prev_ip;

@@ -58,6 +58,9 @@ enum {
 	// module config string
 	CF_MOD_CONFIG,
 
+	// expire for allowed hosts
+	CF_EXPIRE_AUTH,
+
 	// config alerts for logs
 	CF_LOG_FLOOD,
 	CF_LOG_NEWMAC,

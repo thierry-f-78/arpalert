@@ -192,6 +192,9 @@ int maclist_file(char *file_name, int level, int mode){
 				else if(strcmp(args[i], "mac_change") == 0){
 					SET_MAC_CHANGE(bitfield);
 				}
+				else if(strcmp(args[i], "mac_expire") == 0){
+					SET_MAC_EXPIRE(bitfield);
+				}
 				else {
 					logmsg(LOG_ERR,
 					       "file: \"%s\", line %d: flag \"%s\" not availaible",

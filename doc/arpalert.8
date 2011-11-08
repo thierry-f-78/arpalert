@@ -253,6 +253,9 @@ Log/launch script/call module if the ethernet mac address is different than the 
 \fBalert on flood\fR = true
 \fBmod on flood\fR = true
 Log/launch script/call module if have too many arp request per seconds
+.TP
+\fBexpire authorized mac addresses\fR = true
+Allow authorized mac addresses to expire
 .\"
 .\" CONFIG FILE
 .\"
@@ -278,6 +281,8 @@ The available flags are:
 \fBmac_error:\fR Ignore mac error for this mac address
 .br
 \fBmac_change:\fR Ignore mac change for this mac address
+.br
+\fBmac_expire:\fR Never expire this mac address. Usefull if the option "expire authorized mac addresses" is used
 .TP
 \fB/etc/arpalert/authrq.conf\fR:
 All the words after # character are ignored

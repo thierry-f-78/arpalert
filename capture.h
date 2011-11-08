@@ -17,6 +17,7 @@
 #define FLAG_FLOOD      0x00000080 // 7
 #define FLAG_NEWMAC     0x00000100 // 8
 #define FLAG_MACCHG     0x00000200 // 9
+#define FLAG_MACEXPIRE  0x00000400 // 10
 
 // init capture system
 void cap_init(void);

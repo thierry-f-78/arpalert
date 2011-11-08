@@ -322,6 +322,10 @@ void config_load(int argc, char *argv[]){
 	config[CF_MOD_MACCHG].attrib = "mod on mac change";
 	config[CF_MOD_MACCHG].valeur.integer = TRUE;
 
+	config[CF_EXPIRE_AUTH].type = 2;
+	config[CF_EXPIRE_AUTH].attrib = "expire authorized mac addresses";
+	config[CF_EXPIRE_AUTH].valeur.integer = FALSE;
+
 	// load command line parameters for config file
 	strncpy(config_file, CONFIG_FILE, CONFIGFILE_LEN);
 	for(i=1; i<argc; i++){

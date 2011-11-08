@@ -93,6 +93,9 @@ struct data_pack {
 // set mac_change             9: 10th bit
 #define SET_MAC_CHANGE(a)     a |= FLAG_MACCHG
 #define ISSET_MAC_CHANGE(a)   (a & FLAG_MACCHG)
+// set mac_expire             10: 11th bit
+#define SET_MAC_EXPIRE(a)     a |= FLAG_MACEXPIRE
+#define ISSET_MAC_EXPIRE(a)   (a & FLAG_MACEXPIRE)
 
 // initialize data system
 void data_init(void);
