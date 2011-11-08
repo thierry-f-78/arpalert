@@ -322,6 +322,16 @@ void config_load(int argc, char *argv[]){
 	config[CF_MOD_MACCHG].attrib = "mod on mac change";
 	config[CF_MOD_MACCHG].valeur.integer = TRUE;
 
+	config[CF_LOG_EXPIRE].type = 2;
+	config[CF_LOG_EXPIRE].attrib = "log expire mac address";
+	config[CF_LOG_EXPIRE].valeur.integer = FALSE;
+	config[CF_ALERT_EXPIRE].type = 2;
+	config[CF_ALERT_EXPIRE].attrib = "alert on expire mac address";
+	config[CF_ALERT_EXPIRE].valeur.integer = FALSE;
+	config[CF_MOD_EXPIRE].type = 2;
+	config[CF_MOD_EXPIRE].attrib = "mod on expire mac address";
+	config[CF_MOD_EXPIRE].valeur.integer = FALSE;
+
 	config[CF_EXPIRE_AUTH].type = 2;
 	config[CF_EXPIRE_AUTH].attrib = "expire authorized mac addresses";
 	config[CF_EXPIRE_AUTH].valeur.integer = FALSE;

@@ -34,6 +34,7 @@ syn keyword arpTodo      contained TODO FIXME XXX
 " Keys
 syn match   arpKey       /\(log\|alert on\|mod on\) \(\(mac\|ip\) change\|\(referenced\|deny\|new\|new mac\) address\|request abus\|mac error\|unauth request\|flood\)/
 syn match   arpKey       /\(log\|alert\|mod\) mac vendor/
+syn match   arpKey       /\(log\|alert on\|mod on\) expire mac address/
 syn match   arpKey       /expire authorized mac addresses/
 syn match   arpKey       /\(maclist\( alert\| leases\)\?\|log\|lock\|auth request\|mac vendor\) file/
 syn match   arpKey       /use syslog\|log level\|catch only arp\|mod config\|execution timeout\|promiscuous\|reload interval/

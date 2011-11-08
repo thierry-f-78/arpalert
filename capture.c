@@ -94,6 +94,7 @@ int flag_to_no(U_INT32_T flag){
 		case FLAG_FLOOD:     return AL_FLOOD;           break;
 		case FLAG_NEWMAC:    return AL_NEW_MAC;         break;
 		case FLAG_MACCHG:    return AL_MAC_CHANGE;      break;
+		case FLAG_MACEXPIRE: return AL_MAC_EXPIRE;      break;
 	}
 	return -1;
 }
@@ -311,6 +312,10 @@ void cap_init(void){
 	if(IS_CONF(CF_LOG_DENY))        log_bitfield   |= FLAG_DENY;
 	if(IS_CONF(CF_ALERT_DENY))      alert_bitfield |= FLAG_DENY;
 	if(IS_CONF(CF_MOD_DENY))        mod_bitfield   |= FLAG_DENY;
+
+	if(IS_CONF(CF_LOG_EXPIRE))      log_bitfield   |= FLAG_MACEXPIRE;
+	if(IS_CONF(CF_ALERT_EXPIRE))    alert_bitfield |= FLAG_MACEXPIRE;
+	if(IS_CONF(CF_MOD_EXPIRE))      mod_bitfield   |= FLAG_MACEXPIRE;
 
 	// if no device specified, auto select the first
 	if(config[CF_IF].valeur.string == NULL ||

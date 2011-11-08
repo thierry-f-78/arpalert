@@ -72,6 +72,7 @@ enum {
 	CF_LOG_ABUS,
 	CF_LOG_ALLOW,
 	CF_LOG_DENY,
+	CF_LOG_EXPIRE,
 
 	// config alerts for script
 	CF_ALERT_FLOOD,
@@ -84,6 +85,7 @@ enum {
 	CF_ALERT_ABUS,
 	CF_ALERT_ALLOW,
 	CF_ALERT_DENY,
+	CF_ALERT_EXPIRE,
 	
 	// config alerts for module
 	CF_MOD_FLOOD,
@@ -96,6 +98,7 @@ enum {
 	CF_MOD_ABUS,
 	CF_MOD_ALLOW,
 	CF_MOD_DENY,
+	CF_MOD_EXPIRE,
 
 	// total number of arguments
 	NUM_PARAMS

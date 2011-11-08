@@ -14,5 +14,6 @@ char *alert_type[] = {
 	"mac_error",
 	"flood",
 	"new_mac",
-	"mac_change"
+	"mac_change",
+	"mac_expire",
 };

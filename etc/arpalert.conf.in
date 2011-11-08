@@ -73,6 +73,7 @@ catch only arp = true
 # 7: global flood detection
 # 8: new mac adress without ip
 # 9: mac change
+# 10: mac expire
 action on detect = ""
 
 # module launched on each detection
@@ -176,3 +177,9 @@ mod on mac error = true
 log flood = true
 alert on flood	= true
 mod on flood = true
+
+# log if the adress is removed after mac timeout
+log expire mac address = false
+alert on expire mac address = false
+mod on expire mac address = false
+

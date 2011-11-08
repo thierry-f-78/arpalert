@@ -45,6 +45,7 @@
 #define FLOOD                7 
 #define NEW_MAC              8
 #define MAC_CHANGE           9
+#define MAC_EXPIRE           10
 
 // chain devices and idcap
 struct capt {

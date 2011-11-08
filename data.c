@@ -21,6 +21,7 @@
 #include "data.h"
 #include "log.h"
 #include "loadconfig.h"
+#include "capture.h"
 #include "func_time.h"
 #include "func_str.h"
 
@@ -513,6 +514,20 @@ void data_clean(void){
 			      ISSET_MAC_EXPIRE(clean->alerts) == FALSE
 			   )
 			){
+				if(
+					// check if mac expire alert is configured
+					config[CF_ALERT_EXPIRE].valeur.integer == TRUE ||
+					config[CF_LOG_EXPIRE].valeur.integer == TRUE ||
+					config[CF_MOD_EXPIRE].valeur.integer == TRUE
+				){
+					#ifdef DEBUG_DETECT
+					logmsg(LOG_DEBUG, "[%s %d]  -> EXPIRED", __FILE__, __LINE__);
+					#endif
+
+					send_alert(&clean->mac, clean->ip, FLAG_MACEXPIRE,
+					           &null_mac, null_ip, clean->cap_id->device);
+				}
+
 				// unindex ip hash
 				clean->prev_ip->next_ip = clean->next_ip;
 				clean->next_ip->prev_ip = clean->prev_ip;

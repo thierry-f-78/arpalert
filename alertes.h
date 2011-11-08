@@ -17,7 +17,8 @@ enum {
 	AL_MAC_ERROR,
 	AL_FLOOD,
 	AL_NEW_MAC,
-	AL_MAC_CHANGE
+	AL_MAC_CHANGE,
+	AL_MAC_EXPIRE,
 };
 
 extern char *alert_type[];
