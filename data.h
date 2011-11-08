@@ -83,8 +83,8 @@ struct data_pack {
 #define SET_UNAUTH_RQ(a)      a |= 0x00000010
 #define ISSET_UNAUTH_RQ(a)    (a & 0x00000010)
 // set rq_abus                5: 6th bit
-#define SET_RQ_ABUS(a)        a |= 0x00000050
-#define ISSET_RQ_ABUS(a)      (a & 0x00000050)
+#define SET_RQ_ABUS(a)        a |= 0x00000020
+#define ISSET_RQ_ABUS(a)      (a & 0x00000020)
 // set mac_error              6: 7th bit
 #define SET_MAC_ERROR(a)      a |= 0x00000040
 #define ISSET_MAC_ERROR(a)    (a & 0x00000040)
