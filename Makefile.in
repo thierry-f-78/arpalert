@@ -123,3 +123,6 @@ clean:
 install:
 	/bin/sh -x install.sh
 
+pack:
+	git archive --prefix='arpalert-$(TAG)/' --format=tar $(TAG) | gzip > arpalert-$(TAG).tar.gz
+
