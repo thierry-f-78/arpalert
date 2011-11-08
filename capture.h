@@ -7,8 +7,6 @@
 #ifndef __CAPTURE_H__
 #define __CAPTURE_H__
 
-#include <pcap.h>
-
 // init capture system
 void cap_init(void);
 
