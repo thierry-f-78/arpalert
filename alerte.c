@@ -147,6 +147,7 @@ void delpid(int pid){
 
 void alerte_kill_pid(void){
 	int pid;
+	int status;
 
 	#ifdef DEBUG
 	logmsg(LOG_DEBUG,
@@ -155,7 +156,7 @@ void alerte_kill_pid(void){
 	#endif
 
 	while(TRUE){
-		pid = waitpid(0, NULL, WNOHANG);
+		pid = waitpid(0, &status, WNOHANG);
 		
 		// exit if no more child ended
 		if(pid == 0 || ( pid == -1 && errno == ECHILD ) ){
@@ -174,6 +175,26 @@ void alerte_kill_pid(void){
 		       "[%s %i %s] pid [%i] ended",
 		       __FILE__, __LINE__, __FUNCTION__, pid); 
 		#endif
+
+		// normal case: the script exit
+		if (WIFEXITED(status)) {
+			#ifdef DEBUG
+			logmsg(LOG_DEBUG,
+			       "[%s %i] script exited with status %d",
+			       __FILE__, __LINE__, WEXITSTATUS(status));
+			#endif
+		}
+
+		// special cases: killed by signal
+		else if (WIFSIGNALED(status)) {
+			logmsg(LOG_ERR, "[%s %d] script killed by signal %d",
+				__FILE__, __LINE__, WTERMSIG(status));
+		}
+
+		// script dont stopped
+		else
+			continue;
+
 		delpid(pid);
 	}
 }
