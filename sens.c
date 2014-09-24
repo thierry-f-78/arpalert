@@ -274,15 +274,19 @@ int sens_init(int status) {
 			}
 
 			// network address validation
-			mask = atoi(str_mask);
-			binmask.s_addr = dec_to_bin[mask];
-			if( (ip.s_addr & binmask.s_addr) != ip.s_addr){
-				logmsg(LOG_ERR,
-				       "file: \"%s\", line %d: incorrect value %s/%u",
-				       config[CF_AUTHFILE].valeur.string,
-				       ligne, str_ip, str_mask);
-				return -1;
+			if (str_mask) {
+				mask = atoi(str_mask);
+				binmask.s_addr = dec_to_bin[mask];
+				if( (ip.s_addr & binmask.s_addr) != ip.s_addr){
+					logmsg(LOG_ERR,
+					       "file: \"%s\", line %d: incorrect value %s/%u",
+					       config[CF_AUTHFILE].valeur.string,
+					       ligne, str_ip, str_mask);
+					return -1;
+				}
 			}
+			else
+				binmask.s_addr = 0xffffffff;
 
 			// add this network value in hash
 			if(status == SENS_LOAD){
